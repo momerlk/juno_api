@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"os"
 
-	"pakmaweshi.api/handlers"
-	"pakmaweshi.api/internal"
+	"juno.api/handlers"
+	"juno.api/internal"
 
 	"github.com/rs/cors"
 )

@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"pakmaweshi.api/internal"
+	"juno.api/internal"
 )
 
 func (a *App) Feed(w http.ResponseWriter, r *http.Request) {

@@ -5,10 +5,10 @@ import (
 	"net/http"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"pakmaweshi.api/internal"
+	"juno.api/internal"
 )
 
-func (a *App) Dash(w http.ResponseWriter , r *http.Request){
+func (a *App) Dash(w http.ResponseWriter, r *http.Request) {
 	claims, ok := Verify(w, r)
 	if !ok {
 		a.ClientError(w, http.StatusUnauthorized)
@@ -16,7 +16,7 @@ func (a *App) Dash(w http.ResponseWriter , r *http.Request){
 	}
 	userId := claims["user_id"]
 
-	posts, err := internal.Get[internal.Product](r.Context(), &a.Database, "products", bson.M{"user_id":userId})
+	posts, err := internal.Get[internal.Product](r.Context(), &a.Database, "products", bson.M{"user_id": userId})
 	if err != nil {
 		a.ServerError(w, "Dash", err)
 		return
@@ -27,5 +27,5 @@ func (a *App) Dash(w http.ResponseWriter , r *http.Request){
 	}
 
 	json.NewEncoder(w).Encode(posts)
-	
+
 }

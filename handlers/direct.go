@@ -6,20 +6,20 @@ import (
 	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"pakmaweshi.api/internal"
+	"juno.api/internal"
 )
 
-const directsColl =  "directs"
+const directsColl = "directs"
 
 type WSDirectMeta struct {
-	Received 			bool 			`json:"received" bson:"received"`
+	Received bool `json:"received" bson:"received"`
 }
 
 // websocket handler for directs
-func (a *App) WSDirect(ws *internal.WebSocket , conn *internal.WSConnection , data []byte) (err error) {
+func (a *App) WSDirect(ws *internal.WebSocket, conn *internal.WSConnection, data []byte) (err error) {
 	var direct internal.Direct
 
-	err = json.Unmarshal(data , &direct)
+	err = json.Unmarshal(data, &direct)
 	if err != nil {
 		return err
 	}
@@ -27,9 +27,8 @@ func (a *App) WSDirect(ws *internal.WebSocket , conn *internal.WSConnection , da
 	direct.Id = internal.GenerateId()
 	direct.Received = false
 
-
 	var receiver internal.User
-	ok , err := a.Database.Get(context.TODO() , "users" , bson.M{"username" : direct.Receiver} , &receiver)
+	ok, err := a.Database.Get(context.TODO(), "users", bson.M{"username": direct.Receiver}, &receiver)
 	if err != nil {
 		return err
 	}
@@ -40,14 +39,14 @@ func (a *App) WSDirect(ws *internal.WebSocket , conn *internal.WSConnection , da
 	direct.Receiver = receiver.Id
 	direct.Sender = conn.UserId
 
-	log.Printf("WSDirect : direct = %v\n" , direct)
+	log.Printf("WSDirect : direct = %v\n", direct)
 
-	newData , err := json.Marshal(direct)
+	newData, err := json.Marshal(direct)
 	if err != nil {
 		return err
 	}
 
-	ok , err = ws.Send(receiver.Id , newData)
+	ok, err = ws.Send(receiver.Id, newData)
 	if err != nil {
 		return err
 	}
@@ -58,7 +57,7 @@ func (a *App) WSDirect(ws *internal.WebSocket , conn *internal.WSConnection , da
 		direct.Received = false
 	}
 
-	err = a.Database.Store(context.TODO() , directsColl , direct)
+	err = a.Database.Store(context.TODO(), directsColl, direct)
 	if err != nil {
 		return err
 	}
@@ -74,5 +73,3 @@ func (a *App) WSDirect(ws *internal.WebSocket , conn *internal.WSConnection , da
 
 	return err
 }
-
-

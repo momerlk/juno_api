@@ -1,2 +1,2 @@
-# pakmaweshi.api
-API of the pakmaweshi app
+# juno.api
+API of the juno app
