@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"encoding/json"
@@ -144,6 +146,7 @@ func Verify(w http.ResponseWriter, r *http.Request) (jwt.MapClaims, bool) {
 	return tokenClaims, true
 }
 
+// GET : Retrieve user details
 func (a *App) Details(w http.ResponseWriter, r *http.Request) {
 	claims, ok := internal.Verify(w, r)
 	if !ok {
@@ -159,4 +162,53 @@ func (a *App) Details(w http.ResponseWriter, r *http.Request) {
 	user.Id = ""
 
 	json.NewEncoder(w).Encode(user)
+}
+
+func (a *App) Liked(w http.ResponseWriter , r *http.Request){
+	claims , ok := internal.Verify(w , r);
+	if !ok {
+		return
+	}
+
+	userId := claims["user_id"]
+
+	var product []interface{}
+	a.Database.Get(r.Context(), "products" , bson.M{"user_id" : userId} , &product)
+
+	// TODO : Retrieve all the products data from their ids
+
+	json.NewEncoder(w).Encode(product)
+}
+
+func (a *App) Products(w http.ResponseWriter , r *http.Request){
+	_ , ok := internal.Verify(w , r);
+	if !ok {
+		return
+	}
+
+	query_N := r.URL.Query().Get("n")
+	n , err := strconv.Atoi(query_N)
+	if err != nil {
+		http.Error(w , "Query parameter n is not a valid integer" , http.StatusBadRequest);
+		return
+	}
+
+	// get a cursor over the aggregation of products
+	cur , err := a.Database.Collection("products").Aggregate(
+		r.Context() , 
+		bson.A{bson.M{"$sample": bson.M{"size": n}}},
+	)
+	if err != nil {
+		http.Error(w , fmt.Sprintf("Could not get aggregation of products, err : %v" , err.Error()) , http.StatusInternalServerError)
+		return
+	}
+
+	var results []internal.Product
+	err = cur.All(r.Context() , &results)
+	if err != nil {
+		http.Error(w , fmt.Sprintf("Could not get aggregation of products, err : %v" , err.Error()) , http.StatusInternalServerError)
+		return
+	}
+	
+	json.NewEncoder(w).Encode(results)
 }

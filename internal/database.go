@@ -41,6 +41,10 @@ func (d *Database) Init() {
 	d.mongoDB = client.Database(dbName)
 }
 
+func (d *Database) Collection(name string , opts ...*options.CollectionOptions) *mongo.Collection {
+	return d.mongoDB.Collection(name , opts...);
+}
+
 func (d *Database) Store(ctx context.Context , collName string , data interface{}) (error){
 	coll := d.mongoDB.Collection(collName)
 

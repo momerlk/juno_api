@@ -48,7 +48,6 @@ func main(){
 
 	ws := &internal.WebSocket{};
 	ws.Init(mux , "/direct" , app.WSDirect);
-	mux.HandleFunc("/directs" , app.Directs);
 
 	mux.HandleFunc("/upload" , app.UploadFile);
 	mux.HandleFunc("/file", app.DownloadFile)
@@ -56,12 +55,11 @@ func main(){
 	mux.HandleFunc("/signIn" , app.SignIn)
 
 	mux.HandleFunc("/feed" , app.Feed)
-	mux.HandleFunc("/dash" , app.Dash)
 	mux.HandleFunc("/details" , app.Details)
 
-	mux.HandleFunc("/post" , app.CreatePost);
 
-	mux.HandleFunc("/chats", app.Chats)
+	mux.HandleFunc("/products" , app.Products);
+	mux.HandleFunc("/liked" , app.Liked);
 
 	
 	handler := cors.New(cors.Options{

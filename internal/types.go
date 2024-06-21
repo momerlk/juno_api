@@ -1,34 +1,29 @@
 package internal
 
-
+// Product represents the structure of the JSON document
 type Product struct {
-	Id				string 					`json:"id" bson:"id"`
-
-	Name 			string					`json:"name" bson:"name"`		
-	Description		string					`json:"description" bson:"description"`								
-	Price 			string					`json:"price" bson:"price"`
-	Location 		string					`json:"location" bson:"location"`
-	Contact 		string					`json:"contact" bson:"contact"`
-	
-	Avatar 			string					`json:"avatar" bson:"avatar"`
-	Username 		string					`json:"username" bson:"username"`  // username
-	UserId			string					`json:"user_id" bson:"user_id"`	 // user id
-
-	Images 			[]string				`json:"images" bson:"images"` // url of the images
+    ProductID    string              `json:"product_id" bson:"product_id"`
+    ProductURL   string              `json:"product_url" bson:"product_url"`
+    ShopifyID    int64           	 `json:"shopify_id" bson:"shopify_id"`
+    Handle       string              `json:"handle" bson:"handle"`
+    Title        string              `json:"title" bson:"title"`
+    Vendor       string              `json:"vendor" bson:"vendor"`
+    Category     string              `json:"category" bson:"category"`
+    ImageURL     string              `json:"image_url" bson:"image_url"`
+    Description  string              `json:"description" bson:"description"`
+    BodyHTML     string              `json:"body_html" bson:"body_html"`
+    Price        string              `json:"price" bson:"price"`
+    Currency     string              `json:"currency" bson:"currency"`
+    Options      []ProductOption     `json:"options" bson:"options"`
+    Tags         []string            `json:"tags" bson:"tags"`
+    Available    bool                `json:"available" bson:"available"`
 }
 
-type HiddenProduct struct {
-
-	Name 			string					`json:"name" bson:"name"`		
-	Description		string					`json:"description" bson:"description"`								
-	Price 			string					`json:"price" bson:"price"`
-	Location 		string					`json:"location" bson:"location"`
-	Contact 		string					`json:"contact" bson:"contact"`
-	
-	Avatar 			string					`json:"avatar" bson:"avatar"`
-	Username 		string					`json:"username" bson:"username"`  // username
-
-	Images 			[]string				`json:"images" bson:"images"` // url of the images
+// ProductOption represents a product option
+type ProductOption struct {
+    Name     string   `json:"name" bson:"name"`
+    Position int      `json:"position" bson:"position"`
+    Values   []string `json:"values" bson:"values"`
 }
 
 type User struct {
