@@ -51,11 +51,13 @@ func main(){
 	ws.Init(mux , "/feed" , app.WSFeed);
 
 	mux.HandleFunc("/upload" , app.UploadFile);
-	mux.HandleFunc("/file", app.DownloadFile)
-	mux.HandleFunc("/signUp" , app.SignUp)
-	mux.HandleFunc("/signIn" , app.SignIn)
+	mux.HandleFunc("/file", app.DownloadFile);	
 
-	mux.HandleFunc("/details" , app.Details)
+	mux.HandleFunc("/signUp" , app.SignUp);
+	mux.HandleFunc("/signIn" , app.SignIn);
+	mux.HandleFunc("/refresh" , app.Refresh);
+
+	mux.HandleFunc("/details" , app.Details);
 
 
 	mux.HandleFunc("/products" , app.Products);

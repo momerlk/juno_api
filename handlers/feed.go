@@ -31,6 +31,8 @@ func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data [
 	switch action.ActionType {
 	case "open" :
 		a.handleOpen(ws , conn, action);
+	case "undo":
+		a.handleUndo(ws , conn);
 	default :
 		a.handleSwipes(ws , conn, action);
 	}
@@ -38,8 +40,90 @@ func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data [
 	return err
 }
 
+// handle undo action
+func (a *App) handleUndo(
+	ws *internal.WebSocket,
+	conn *internal.WSConnection,
+){
+	// retrieve user's recommendation history
+	var userHistory internal.UserHistory
+	found , err := a.Database.Get(
+		context.TODO() , 
+		historiesColl , 
+		bson.M{"user_id" : conn.UserId} , 
+		&userHistory,
+	)
+	if err != nil{ // internal error in database
+		ws.Message(
+			conn ,
+			http.StatusInternalServerError , 
+			"Failed to retrieve user history",
+		);
+		return;
+	}
+	if !found { // no user history
+		ws.Message(
+			conn,
+			http.StatusBadRequest,
+			"First send 'open' message to websocket",
+		)
+		return;
+	}
+
+	userHistory.Index = userHistory.Index - 1;
+
+	// products which need to be retrieved from database
+	toFetch := userHistory.Products;
+	var toFetchLen int
+	if len(toFetch) <= 3 { toFetchLen = len(toFetch) } else { toFetchLen = 3 }
+
+
+	// Update user history
+	coll := a.Database.Collection(historiesColl)
+	coll.FindOneAndReplace(
+		context.TODO() , 
+		bson.M{"user_id" : conn.UserId} , 
+		userHistory,
+	);
+
+	// products to display to user
+	var products []internal.Product
+	for i := userHistory.Index;i < toFetchLen;i++ {
+		
+		var product internal.Product
+		productId := toFetch[i];
+
+		a.Database.Get(
+			context.TODO(), 
+			"products",
+			bson.M{"product_id" : productId},
+			&product,
+		)
+
+		products = append(products , product)
+	}
+
+	data , err := json.Marshal(products)
+	if err != nil {
+		ws.Message(
+			conn,
+			http.StatusInternalServerError,
+			"Failed to encode products into json",
+		)
+		return;
+	}
+
+
+	ws.Send(conn.UserId , data);
+}
+
+
 // handles actions with action type "open"
-func (a *App) handleOpen(ws *internal.WebSocket, conn *internal.WSConnection,action internal.Action){
+func (a *App) handleOpen(
+	ws *internal.WebSocket, 
+	conn *internal.WSConnection,
+	action internal.Action,
+){
 	if action.ActionType != "open" {
 		return
 	}
@@ -227,10 +311,10 @@ func (a *App) handleOpen(ws *internal.WebSocket, conn *internal.WSConnection,act
 
 // for handling swipes
 func (a *App) handleSwipes(
-		ws *internal.WebSocket, 
-		conn *internal.WSConnection,
-		action internal.Action,
-	){
+	ws *internal.WebSocket, 
+	conn *internal.WSConnection,
+	action internal.Action,
+){
 
 	data := &internal.Action{
 		UserID : conn.UserId,
@@ -360,3 +444,4 @@ func (a *App) handleSwipes(
 
 	ws.Send(conn.UserId , toSend);
 }
+
