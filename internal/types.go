@@ -1,5 +1,25 @@
 package internal
 
+import (
+)
+
+// Action represents an action performed by a user
+type Action struct {
+    UserID         	string    `json:"user_id" bson:"user_id"`
+    ActionID       	string    `json:"action_id" bson:"action_id"`
+    ActionType     	string    `json:"action_type" bson:"action_type"`
+    ActionTimestamp string `json:"action_timestamp" bson:"action_timestamp"`
+    ProductID      	string    `json:"product_id" bson:"product_id"`
+}
+
+// Action represents an action performed by a user
+type UserHistory struct {
+    UserID   string   `json:"user_id" bson:"user_id"`
+    Products []string `json:"products" bson:"products"`
+    Index    int      `json:"index" bson:"index"`
+}
+
+
 // Product represents the structure of the JSON document
 type Product struct {
     ProductID    string              `json:"product_id" bson:"product_id"`

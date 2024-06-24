@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -180,6 +181,25 @@ func (a *App) Liked(w http.ResponseWriter , r *http.Request){
 	json.NewEncoder(w).Encode(product)
 }
 
+func (a *App) Recommend(n int) ([]internal.Product, error) {
+	// get a cursor over the aggregation of products
+	cur , err := a.Database.Collection("products").Aggregate(
+		context.TODO(),
+		bson.A{bson.M{"$sample": bson.M{"size": n}}},
+	)
+	if err != nil {
+		return nil,  err
+	}
+
+	var results []internal.Product
+	err = cur.All(context.TODO() , &results)
+	if err != nil {
+		return nil , err
+	}
+
+	return results , nil
+}
+
 func (a *App) Products(w http.ResponseWriter , r *http.Request){
 	_ , ok := internal.Verify(w , r);
 	if !ok {
@@ -212,3 +232,6 @@ func (a *App) Products(w http.ResponseWriter , r *http.Request){
 	
 	json.NewEncoder(w).Encode(results)
 }
+
+// TODO : Group items by brand
+func (a *App) Cart(w http.ResponseWriter , r *http.Request){}

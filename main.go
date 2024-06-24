@@ -46,15 +46,15 @@ func main(){
 		Database: db,
 	}
 
+	
 	ws := &internal.WebSocket{};
-	ws.Init(mux , "/direct" , app.WSDirect);
+	ws.Init(mux , "/feed" , app.WSFeed);
 
 	mux.HandleFunc("/upload" , app.UploadFile);
 	mux.HandleFunc("/file", app.DownloadFile)
 	mux.HandleFunc("/signUp" , app.SignUp)
 	mux.HandleFunc("/signIn" , app.SignIn)
 
-	mux.HandleFunc("/feed" , app.Feed)
 	mux.HandleFunc("/details" , app.Details)
 
 
@@ -64,8 +64,6 @@ func main(){
 	
 	handler := cors.New(cors.Options{
 		AllowedOrigins : []string{
-			"http://localhost:19000",
-			"http://192.168.18.6:19000",
 			"*",
 		},
 		AllowCredentials : true,

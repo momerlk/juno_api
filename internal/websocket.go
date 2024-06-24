@@ -1,15 +1,14 @@
 package internal
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
 	jwt "github.com/golang-jwt/jwt/v5"
 
-
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
-
 )
 
 func Verify(w http.ResponseWriter , r *http.Request) (jwt.MapClaims , bool) {
@@ -49,7 +48,7 @@ type WebSocket struct {
 	epoller 		*Epoll
 }
 
-func (socket *WebSocket)Init(mux *http.ServeMux, endpoint string, onRead func(ws *WebSocket, conn *WSConnection, data []byte) error){
+func (socket *WebSocket)Init(mux *http.ServeMux, endpoint string, onRead func(ws *WebSocket, conn *WSConnection, data []byte) error) {
 	// Start epoll
 	var err error
 	epoller, err := MkEpoll()
@@ -75,13 +74,17 @@ func (socket *WebSocket) Send(userId string , data []byte) (bool , error) {
 
 	err := wsutil.WriteServerText(conn.Conn , data)
 	if err != nil {
+		log.Printf("error on sent = %v\n" , err)
 		return false , err
 	}
+
+
 
 	return true , nil
 }
 
 func (socket *WebSocket) Start(onRead func(websocket *WebSocket, conn *WSConnection , data []byte) error ){
+	log.Println("started epolling")
 	for {
 		connections, err := socket.epoller.Wait()
 		
@@ -111,7 +114,6 @@ func (socket *WebSocket) Start(onRead func(websocket *WebSocket, conn *WSConnect
 }
 
 func (socket *WebSocket) ServeHTTP(w http.ResponseWriter , r *http.Request){
-
 	claims , ok := Verify(w , r)
 	if !ok {
 		return
@@ -123,10 +125,25 @@ func (socket *WebSocket) ServeHTTP(w http.ResponseWriter , r *http.Request){
 	// Upgrade connection
 	conn, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
+		log.Printf("failed to upgrade websocket , err = %v\n" , err)
 		return
 	}
 	if err := socket.epoller.Add(&WSConnection{NetConn : conn, UserId: userId}); err != nil {
 		log.Printf("Failed to add connection %v", err)
 		conn.Close()
 	}
+}
+
+type WSMessage struct {
+	Message			string 			`json:"message" bson:"message"`
+	Status 			int 			`json:"status" bson:"status"`
+}
+
+// TODO : Add error handling
+func (socket *WebSocket) Message(conn *WSConnection,status int,message string){
+	data , _ := json.Marshal(&WSMessage{
+		Message : message,
+		Status : status,
+	})
+	socket.Send(conn.UserId , data)
 }
