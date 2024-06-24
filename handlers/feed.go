@@ -5,13 +5,15 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"juno.api/internal"
 )
 
 const historiesColl = "histories"
-
+const actionsColl = "actions"
 
 
 // websocket handler for directs
@@ -29,6 +31,8 @@ func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data [
 	switch action.ActionType {
 	case "open" :
 		a.handleOpen(ws , conn, action);
+	default :
+		a.handleSwipes(ws , conn, action);
 	}
 
 	return err
@@ -218,4 +222,141 @@ func (a *App) handleOpen(ws *internal.WebSocket, conn *internal.WSConnection,act
 
 	
 
+}
+
+
+// for handling swipes
+func (a *App) handleSwipes(
+		ws *internal.WebSocket, 
+		conn *internal.WSConnection,
+		action internal.Action,
+	){
+
+	data := &internal.Action{
+		UserID : conn.UserId,
+		ProductID: action.ProductID,
+		ActionType : action.ActionType,
+		ActionID: uuid.NewString(),
+		ActionTimestamp: time.Now().String(),
+	}
+
+	// retrieve user's recommendation history
+	var userHistory internal.UserHistory
+	found , err := a.Database.Get(
+		context.TODO() , 
+		historiesColl , 
+		bson.M{"user_id" : conn.UserId} , 
+		&userHistory,
+	)
+	if err != nil{ // internal error in database
+		ws.Message(
+			conn ,
+			http.StatusInternalServerError , 
+			"Failed to retrieve user history",
+		);
+		return;
+	}
+	if !found { // no user history
+		ws.Message(
+			conn,
+			http.StatusBadRequest,
+			"First send 'open' message to websocket",
+		)
+		return;
+	}
+
+
+	err = a.Database.Store(context.TODO() , actionsColl , data)
+	if err != nil {
+		ws.Message(
+			conn,
+			http.StatusInternalServerError,
+			"Failed to save user action",
+		)
+		return;
+	}
+
+	userHistory.Index += 1; // update the index 
+
+
+	// if there are more than 3 items in user history after index return
+	notSeen := len(userHistory.Products) - userHistory.Index
+	if notSeen > 2 {
+		// Update user history
+		coll := a.Database.Collection(historiesColl)
+		coll.FindOneAndReplace(
+			context.TODO() , 
+			bson.M{"user_id" : conn.UserId} , 
+			userHistory,
+		);
+
+		return;
+	}
+
+	// by using toRecommend reduces the number of operations
+	recProducts , err := a.Recommend(2);
+	if err != nil {
+		ws.Message(
+			conn,
+			http.StatusInternalServerError,
+			"Failed to recommend products",
+		)
+		return;
+	}
+
+	// store an array of the product ids of the recommended products
+	productIds := userHistory.Products
+	for i := 0;i < len(recProducts);i++ {
+		productIds = append(productIds, recProducts[i].ProductID)
+	}
+
+
+	// products which need to be retrieved from database
+	toFetch := userHistory.Products;
+
+	userHistory.Products = productIds; // updated ids
+
+
+	// Update user history
+	coll := a.Database.Collection(historiesColl)
+	coll.FindOneAndReplace(
+		context.TODO() , 
+		bson.M{"user_id" : conn.UserId} , 
+		userHistory,
+	);
+
+	// products to display to user
+	var products []internal.Product
+	for i := userHistory.Index;i < len(toFetch);i++ {
+		
+		var product internal.Product
+		productId := toFetch[i];
+
+		a.Database.Get(
+			context.TODO(), 
+			"products",
+			bson.M{"product_id" : productId},
+			&product,
+		)
+
+		products = append(products , product)
+	}
+
+	products = append(products , recProducts...)
+	// shorten products to less or equal to three items
+	if len(products) >= 3{
+		products = products[0:3]
+	}
+	toSend , err := json.Marshal(products)
+	if err != nil {
+		ws.Message(
+			conn,
+			http.StatusInternalServerError,
+			"Failed to encode products into json",
+		)
+		return;
+	}
+
+
+	ws.Send(conn.UserId , toSend);
 }
