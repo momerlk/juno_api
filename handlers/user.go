@@ -21,6 +21,18 @@ import (
 
 const usersColl = "users"
 
+func GenerateToken(UserId string) (string, error){
+	secret := internal.Getenv("JWT_KEY")
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"user_id":    UserId,
+			"session_id": internal.GenerateId(),
+			"exp":        time.Now().Add(4 * time.Hour).Unix(),
+		})
+
+	tokenString, err := token.SignedString([]byte(secret))
+	return tokenString , err;
+}
+
 func (a *App) SignUp(w http.ResponseWriter, r *http.Request) {
 	var body internal.User
 	err := json.NewDecoder(r.Body).Decode(&body)
@@ -49,9 +61,8 @@ type SignInBody struct {
 	UsernameEmail string `json:"username_email" bson:"username_email"` // username or email
 	Password      string `json:"password" bson:"password"`
 }
-type SignInResp struct {
+type TokenResp struct {
 	Token string `json:"token" bson:"token"`
-	internal.User
 }
 
 func (a *App) SignIn(w http.ResponseWriter, r *http.Request) {
@@ -87,15 +98,8 @@ func (a *App) SignIn(w http.ResponseWriter, r *http.Request) {
 
 	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password)) == nil {
 		log.Println("user is authenticated")
-		// User is authenticated
-		secret := internal.Getenv("JWT_KEY")
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"user_id":    user.Id,
-			"session_id": internal.GenerateId(),
-			"exp":        time.Now().Add(4 * time.Hour).Unix(),
-		})
 
-		tokenString, err := token.SignedString([]byte(secret))
+		tokenString, err := GenerateToken(user.Id);
 		if err != nil {
 			a.ServerError(w, "Sign In", err)
 			return
@@ -104,7 +108,7 @@ func (a *App) SignIn(w http.ResponseWriter, r *http.Request) {
 		user.Password = ""
 		user.Id = ""
 
-		err = json.NewEncoder(w).Encode(SignInResp{Token: tokenString, User: user})
+		err = json.NewEncoder(w).Encode(TokenResp{Token: tokenString})
 		if err != nil {
 			a.ServerError(w, "Sign In", err)
 			return
@@ -145,6 +149,32 @@ func Verify(w http.ResponseWriter, r *http.Request) (jwt.MapClaims, bool) {
 	}
 
 	return tokenClaims, true
+}
+
+func (a *App) Refresh(w http.ResponseWriter , r *http.Request){
+	if r.Method != http.MethodGet {
+		a.ClientError(w , http.StatusMethodNotAllowed);
+		return
+	}
+
+	claims , ok := internal.Verify(w ,r);
+	if !ok {
+		return;
+	}
+
+	userId := claims["user_id"];
+
+	token, err := GenerateToken(userId.(string))
+	if err != nil {
+		http.Error(w , "Failed to generate authentication token" , http.StatusInternalServerError);
+		return;
+	}
+
+	err = json.NewEncoder(w).Encode(TokenResp{Token: token})
+	if err != nil {
+		a.ServerError(w, "Sign In", err)
+		return
+	}
 }
 
 // GET : Retrieve user details
