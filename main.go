@@ -61,6 +61,7 @@ func main(){
 
 
 	mux.HandleFunc("/products" , app.Products);
+	mux.HandleFunc("/search" , app.SearchProducts);
 	mux.HandleFunc("/liked" , app.Liked);
 
 	

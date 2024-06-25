@@ -230,6 +230,7 @@ func (a *App) Recommend(n int) ([]internal.Product, error) {
 	return results , nil
 }
 
+
 func (a *App) Products(w http.ResponseWriter , r *http.Request){
 	_ , ok := internal.Verify(w , r);
 	if !ok {
@@ -265,3 +266,67 @@ func (a *App) Products(w http.ResponseWriter , r *http.Request){
 
 // TODO : Group items by brand
 func (a *App) Cart(w http.ResponseWriter , r *http.Request){}
+
+type Fuzzy struct {
+    MaxEdits      *int `bson:"maxEdits,omitempty" json:"maxEdits,omitempty"`
+    PrefixLength  *int `bson:"prefixLength,omitempty" json:"prefixLength,omitempty"`
+    MaxExpansions *int `bson:"maxExpansions,omitempty" json:"maxExpansions,omitempty"`
+}
+
+type Score struct {
+    Boost    *float64            `bson:"boost,omitempty" json:"boost,omitempty"`
+    Constant *float64            `bson:"constant,omitempty" json:"constant,omitempty"`
+    Function *map[string]float64 `bson:"function,omitempty" json:"function,omitempty"`
+}
+
+type Query struct {
+    Query    interface{} `bson:"query" json:"query"` // string or array of strings
+    Path     interface{} `bson:"path" json:"path"`   // string or array of strings
+    Fuzzy    *Fuzzy      `bson:"fuzzy,omitempty" json:"fuzzy,omitempty"`
+    Score    *Score      `bson:"score,omitempty" json:"score,omitempty"`
+    Synonyms *string     `bson:"synonyms,omitempty" json:"synonyms,omitempty"`
+}
+
+func ptrInt(v int) *int {
+    return &v
+}
+
+func ptrFloat64(v float64) *float64 {
+    return &v
+}
+
+func ptrString(v string) *string {
+    return &v
+}
+
+func (a *App) SearchProducts(w http.ResponseWriter , r *http.Request){
+	if r.Method != http.MethodGet {
+		a.ClientError(w , http.StatusMethodNotAllowed);
+		return;
+	}
+	
+	queryString := r.URL.Query().Get("q")
+	query := Query{
+        Query: queryString,
+        Path:  "description",
+        Fuzzy: &Fuzzy{
+            MaxEdits:      ptrInt(2),
+            PrefixLength:  ptrInt(1),
+            MaxExpansions: ptrInt(50),
+        },
+        Score: &Score{
+            Boost:    ptrFloat64(1.5),
+            Constant: ptrFloat64(1.0),
+            Function: &map[string]float64{"value": 2.0},
+        },
+        Synonyms: ptrString("mySynonyms"),
+    }
+
+	products , err := internal.Get[internal.Product](r.Context() , &a.Database, "products" , query);
+	if err != nil {
+		http.Error(w , "Failed to perform search" , http.StatusInternalServerError);
+		return;
+	}
+
+	json.NewEncoder(w).Encode(products);
+}
