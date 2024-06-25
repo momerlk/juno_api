@@ -14,6 +14,8 @@ import (
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+
 	"juno.api/internal"
 
 	"net/http"
@@ -267,66 +269,57 @@ func (a *App) Products(w http.ResponseWriter , r *http.Request){
 // TODO : Group items by brand
 func (a *App) Cart(w http.ResponseWriter , r *http.Request){}
 
-type Fuzzy struct {
-    MaxEdits      *int `bson:"maxEdits,omitempty" json:"maxEdits,omitempty"`
-    PrefixLength  *int `bson:"prefixLength,omitempty" json:"prefixLength,omitempty"`
-    MaxExpansions *int `bson:"maxExpansions,omitempty" json:"maxExpansions,omitempty"`
-}
 
-type Score struct {
-    Boost    *float64            `bson:"boost,omitempty" json:"boost,omitempty"`
-    Constant *float64            `bson:"constant,omitempty" json:"constant,omitempty"`
-    Function *map[string]float64 `bson:"function,omitempty" json:"function,omitempty"`
-}
-
-type Query struct {
-    Query    interface{} `bson:"query" json:"query"` // string or array of strings
-    Path     interface{} `bson:"path" json:"path"`   // string or array of strings
-    Fuzzy    *Fuzzy      `bson:"fuzzy,omitempty" json:"fuzzy,omitempty"`
-    Score    *Score      `bson:"score,omitempty" json:"score,omitempty"`
-    Synonyms *string     `bson:"synonyms,omitempty" json:"synonyms,omitempty"`
-}
-
-func ptrInt(v int) *int {
-    return &v
-}
-
-func ptrFloat64(v float64) *float64 {
-    return &v
-}
-
-func ptrString(v string) *string {
-    return &v
-}
-
-func (a *App) SearchProducts(w http.ResponseWriter , r *http.Request){
+func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		a.ClientError(w , http.StatusMethodNotAllowed);
-		return;
+		a.ClientError(w, http.StatusMethodNotAllowed)
+		return
 	}
-	
+
+
 	queryString := r.URL.Query().Get("q")
-	query := Query{
-        Query: queryString,
-        Path:  "description",
-        Fuzzy: &Fuzzy{
-            MaxEdits:      ptrInt(2),
-            PrefixLength:  ptrInt(1),
-            MaxExpansions: ptrInt(50),
-        },
-        Score: &Score{
-            Boost:    ptrFloat64(1.5),
-            Constant: ptrFloat64(1.0),
-            Function: &map[string]float64{"value": 2.0},
-        },
-        Synonyms: ptrString("mySynonyms"),
-    }
+	if queryString == "" {
+		http.Error(w, "Query parameter is required", http.StatusBadRequest)
+		return
+	}
+	log.Println("query =" , queryString)
 
-	products , err := internal.Get[internal.Product](r.Context() , &a.Database, "products" , query);
-	if err != nil {
-		http.Error(w , "Failed to perform search" , http.StatusInternalServerError);
-		return;
+	// Define default fuzzy search parameters
+
+
+	// Construct the query with fuzzy parameters
+	query :=  bson.D{
+		{Key: "$search", Value: bson.D{
+			{Key: "index", Value: "desc"}, // Ensure this matches your index name
+			{Key: "text", Value: bson.D{
+				{Key: "query", Value: queryString},
+				{Key: "path", Value: bson.D{
+					{Key: "wildcard", Value: "*"},
+				}},
+			}},
+		}},
 	}
 
-	json.NewEncoder(w).Encode(products);
+	limitStage := bson.D{{Key: "$limit", Value: 10}}
+
+
+	// Perform the search
+	collection := a.Database.Collection("products")
+	cursor, err := collection.Aggregate(r.Context(), mongo.Pipeline{query , limitStage})
+	if err != nil {
+		log.Println("Failed to perform search, err =" , err)
+		http.Error(w, "Failed to perform search", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(r.Context())
+
+	var products []internal.Product
+	if err = cursor.All(r.Context(), &products); err != nil {
+		http.Error(w, "Failed to parse search results", http.StatusInternalServerError)
+		return
+	}
+
+
+	// Encode the result as JSON and write to response
+	json.NewEncoder(w).Encode(products)
 }
