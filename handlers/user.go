@@ -267,7 +267,46 @@ func (a *App) Products(w http.ResponseWriter , r *http.Request){
 }
 
 // TODO : Group items by brand
-func (a *App) Cart(w http.ResponseWriter , r *http.Request){}
+func (a *App) Cart(w http.ResponseWriter , r *http.Request){
+	if r.Method != http.MethodGet {
+		a.ClientError(w , http.StatusMethodNotAllowed);
+		return;
+	}
+
+	claims , ok := internal.Verify(w,r);
+	if !ok {
+		return;
+	}
+	userId := claims["user_id"]
+
+	actions , err := internal.Get[internal.Action](
+		r.Context() , &a.Database, actionsColl , 
+		bson.M{"user_id" : userId , "action_type" : "added_to_cart"},
+	);
+	if err != nil {
+		a.ServerError(w , "CART" , err) // TODO : add error strings to server error
+		return;
+	}
+
+
+	productsByVendor := make(map[string]internal.Product)
+
+	for _ , action := range actions {
+		var product internal.Product
+
+		found , err := a.Database.Get(r.Context() , "products" , bson.M{"product_id" : action.ProductID} , &product);
+		if !found { continue }
+		if err != nil {
+			http.Error(w , "Failed to get retrieve products from database" , http.StatusInternalServerError);
+			return;
+		}
+
+		productsByVendor[product.Vendor] = product;
+
+	}
+
+	json.NewEncoder(w).Encode(productsByVendor)
+}
 
 
 func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
@@ -282,10 +321,6 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Query parameter is required", http.StatusBadRequest)
 		return
 	}
-	log.Println("query =" , queryString)
-
-	// Define default fuzzy search parameters
-
 
 	// Construct the query with fuzzy parameters
 	query :=  bson.D{

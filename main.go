@@ -50,19 +50,20 @@ func main(){
 	ws := &internal.WebSocket{};
 	ws.Init(mux , "/feed" , app.WSFeed);
 
-	mux.HandleFunc("/upload" , app.UploadFile);
-	mux.HandleFunc("/file", app.DownloadFile);	
+	mux.HandleFunc("/upload" , app.UploadFile); // POST : Upload a file to the database using gridFS
+	mux.HandleFunc("/file", app.DownloadFile);	// GET : download file from the database using gridFS
 
-	mux.HandleFunc("/signUp" , app.SignUp);
-	mux.HandleFunc("/signIn" , app.SignIn);
-	mux.HandleFunc("/refresh" , app.Refresh);
+	mux.HandleFunc("/signUp" , app.SignUp); // POST 
+	mux.HandleFunc("/signIn" , app.SignIn);	// POST 
+	mux.HandleFunc("/refresh" , app.Refresh);	// GET : refresh authentication token
 
-	mux.HandleFunc("/details" , app.Details);
+	mux.HandleFunc("/details" , app.Details);	// GET : Get user account details
 
 
-	mux.HandleFunc("/products" , app.Products);
-	mux.HandleFunc("/search" , app.SearchProducts);
-	mux.HandleFunc("/liked" , app.Liked);
+	mux.HandleFunc("/products" , app.Products); // GET get top n product recommendations 
+	mux.HandleFunc("/search" , app.SearchProducts); // GET : search products database given a query
+	mux.HandleFunc("/liked" , app.Liked); // GET : get all products liked by user
+	mux.HandleFunc("/cart" , app.Cart); // GET : Get user's shopping cart
 
 	
 	handler := cors.New(cors.Options{
