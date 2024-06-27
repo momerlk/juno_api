@@ -5,11 +5,19 @@ import (
 
 // Action represents an action performed by a user
 type Action struct {
-    UserID         	string    `json:"user_id" bson:"user_id"`
-    ActionID       	string    `json:"action_id" bson:"action_id"`
-    ActionType     	string    `json:"action_type" bson:"action_type"`
-    ActionTimestamp string `json:"action_timestamp" bson:"action_timestamp"`
-    ProductID      	string    `json:"product_id" bson:"product_id"`
+    UserID         	    string          `json:"user_id" bson:"user_id"`
+    ActionID       	    string          `json:"action_id" bson:"action_id"`
+    ActionType     	    string          `json:"action_type" bson:"action_type"`
+    ActionTimestamp     string          `json:"action_timestamp" bson:"action_timestamp"`
+    ProductID      	    string          `json:"product_id" bson:"product_id"`
+    DataType            string          `json:"data_type" bson:"data_type"` 
+    Query               ActionQuery     `json:"query" bson:"query"` 
+}
+
+// for product just add "product_id" to filter
+type ActionQuery struct {
+    Text                string          `json:"text"`
+    Filter              interface{}     `json:"filter" bson:"filter"`
 }
 
 // Action represents an action performed by a user

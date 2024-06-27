@@ -9,12 +9,15 @@ import (
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"juno.api/internal"
 )
 
 const historiesColl = "histories"
 const actionsColl = "actions"
 
+
+// FEED Options : query, filter, see product
 
 // websocket handler for directs
 func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data []byte) (err error) {
@@ -32,7 +35,7 @@ func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data [
 	case "open" :
 		a.handleOpen(ws , conn, action);
 	case "undo":
-		a.handleUndo(ws , conn);
+		a.handleUndo(ws , conn, action);
 	default :
 		a.handleSwipes(ws , conn, action);
 	}
@@ -40,69 +43,109 @@ func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data [
 	return err
 }
 
+func (a *App) RecommendWithQuery(action internal.Action) ([]internal.Product , error){
+	log.Println("filter =" , action.Query.Filter)
+	log.Println("text =" , action.Query.Text)
+	if action.Query.Filter != nil  && action.Query.Text == "" {
+		n := 2;
+
+		// Construct the aggregation pipeline
+		pipeline := bson.A{
+			bson.M{"$match": action.Query.Filter},               // Add $match stage to filter by category
+			bson.M{"$sample": bson.M{"size": n}},   // Add $sample stage for random sampling
+		}
+
+		// Perform aggregation
+		cur, err := a.Database.Collection("products").Aggregate(
+			context.TODO(),
+			pipeline,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Decode results into a slice of internal.Product
+		var results []internal.Product
+		err = cur.All(context.TODO(), &results)
+		if err != nil {
+			return nil, err
+		}
+
+		return results, nil		
+	}
+
+
+	if action.Query.Text != "" {
+		// Construct the query with fuzzy parameters
+		query :=  bson.D{
+			{Key: "$search", Value: bson.D{
+				{Key: "index", Value: "desc"}, // Ensure this matches your index name
+				{Key: "text", Value: bson.D{
+					{Key: "query", Value: action.Query.Text},
+					{Key: "path", Value: bson.D{
+						{Key: "wildcard", Value: "*"},
+					}},
+				}},
+			}},
+		}
+
+		limitStage := bson.D{{Key: "$limit", Value: 10}}
+
+
+		// Perform the search
+		collection := a.Database.Collection("products")
+
+
+		var cursor *mongo.Cursor
+		var err error
+		if action.Query.Filter == nil {
+			cursor, err = collection.Aggregate(context.TODO(), mongo.Pipeline{
+				query , limitStage,
+			})
+			if err != nil {
+				return nil, err;
+			}
+
+		} else {
+			cursor , err = collection.Aggregate(
+				context.TODO() , 
+				bson.A{query,bson.M{"$match" : action.Query.Filter},limitStage},
+			)
+			if err != nil {
+				log.Println("cursor with filter error =" , err)
+				return nil , err;
+			}
+
+		}
+		defer cursor.Close(context.TODO())
+
+
+
+		var products []internal.Product
+		if err = cursor.All(context.TODO(), &products); err != nil {
+			return nil , err;
+		}	
+		return products, nil;
+	}
+
+
+	return nil , nil;
+}
+
 // handle undo action
 func (a *App) handleUndo(
 	ws *internal.WebSocket,
 	conn *internal.WSConnection,
+	action internal.Action,
 ){
-	// retrieve user's recommendation history
-	var userHistory internal.UserHistory
-	found , err := a.Database.Get(
-		context.TODO() , 
-		historiesColl , 
-		bson.M{"user_id" : conn.UserId} , 
-		&userHistory,
-	)
-	if err != nil{ // internal error in database
-		ws.Message(
-			conn ,
-			http.StatusInternalServerError , 
-			"Failed to retrieve user history",
-		);
-		return;
-	}
-	if !found { // no user history
+	products , err := a.RecommendWithQuery(action);
+	if err != nil {
 		ws.Message(
 			conn,
-			http.StatusBadRequest,
-			"First send 'open' message to websocket",
-		)
+			http.StatusInternalServerError,
+			"Failed to get product recommendations",
+		);
 		return;
-	}
-
-	if userHistory.Index < 2 {
-		return;
-	}
-
-	userHistory.Index = userHistory.Index - 1;
-
-	// products which need to be retrieved from database
-	toFetch := userHistory.Products;
-	var toFetchLen int
-	if len(toFetch) <= 3 { toFetchLen = len(toFetch) } else { toFetchLen = 3 }
-
-	// Update user history
-	coll := a.Database.Collection(historiesColl)
-	coll.FindOneAndReplace(
-		context.TODO() , 
-		bson.M{"user_id" : conn.UserId} , 
-		userHistory,
-	);
-
-	// products to display to user
-	var products []internal.Product
-	for i := userHistory.Index;i < userHistory.Index + toFetchLen;i++ {
-		var product internal.Product
-		productId := userHistory.Products[i];
-
-		a.Database.Get(
-			context.TODO(), 
-			"products",
-			bson.M{"product_id" : productId},
-			&product,
-		)
-
-		products = append(products , product)
 	}
 
 	data , err := json.Marshal(products)
@@ -110,13 +153,11 @@ func (a *App) handleUndo(
 		ws.Message(
 			conn,
 			http.StatusInternalServerError,
-			"Failed to encode products into json",
+			"Failed to encode products data into JSON",
 		)
-		return;
 	}
 
-	log.Println("WSFEED UNDO : products length =" , len(products))
-	ws.Send(conn.UserId , data);
+	ws.Send(conn.UserId , data)
 }
 
 
@@ -126,238 +167,26 @@ func (a *App) handleOpen(
 	conn *internal.WSConnection,
 	action internal.Action,
 ){
-
-	// retrieve user's recommendation history
-	var userHistory internal.UserHistory
-	found , err := a.Database.Get(
-		context.TODO() , 
-		historiesColl , 
-		bson.M{"user_id" : conn.UserId} , 
-		&userHistory,
-	)
-	if err != nil { // internal error in database
-		log.Println("WSFeed : failed to retrieve user history, userid =" , conn.UserId)
+	products , err := a.RecommendWithQuery(action);
+	if err != nil {
 		ws.Message(
-			conn ,
-			http.StatusInternalServerError , 
-			"Failed to retrieve user history",
+			conn,
+			http.StatusInternalServerError,
+			"Failed to get product recommendations",
 		);
 		return;
 	}
 
-
-	if !found { // IF FIRST TIME USER
-		log.Println("WSFeed : first time user, userid =" , conn.UserId)
-		recProducts , err := a.Recommend(3);
-		if err != nil {
-			ws.Message(
-				conn,
-				http.StatusInternalServerError,
-				"Failed to recommend products",
-			)
-			return;
-		}
-
-		// store an array of the product ids of the recommended products
-		var productIds []string 
-		for i := 0;i < len(recProducts);i++ {
-			productIds = append(productIds, recProducts[i].ProductID)
-		}
-
-		// user history with recommnded products
-		newHistory := &internal.UserHistory{
-			UserID : conn.UserId,
-			Products : productIds,
-			Index : 0,	
-		}
-
-		err = a.Database.Store(context.TODO() , historiesColl , newHistory)
-		if err != nil {
-			ws.Message(
-				conn, 
-				http.StatusInternalServerError,
-				"Failed to store user history",
-			)
-			return;
-		}
-
-		// products to display to user
-		var products []internal.Product
-		for i := 0;i < len(newHistory.Products);i++ {
-			
-			var product internal.Product
-			productId := newHistory.Products[i];
-
-			a.Database.Get(
-				context.TODO(), 
-				"products",
-				bson.M{"product_id" : productId},
-				&product,
-			)
-
-			products = append(products , product)
-		}
-
-
-		// TODO : update send to do this automatically
-		data , err := json.Marshal(products)
-		if err != nil {
-			ws.Message(
-				conn,
-				http.StatusInternalServerError,
-				"Failed to encode products into json",
-			)
-			return;
-		}
-		log.Println("WSFEED Open : products length =" , len(products))
-
-		sent , err := ws.Send(conn.UserId , data);
-		if err != nil {
-			log.Printf("Failed to write to websocket , err = %v\n",err)
-			return;
-		}
-		if !sent {
-			log.Printf("Connection closed failed to send")
-		}
-
-
-	} else { // NOT A FIRST TIME USER
-		userHistory.Index += 1; // update the index 
-		log.Println("WSFeed : not first time user, userid =" , conn.UserId)
-
-		// if there are more than 3 items in user history after index return
-		notSeen := len(userHistory.Products) - userHistory.Index
-		if notSeen > 2 {
-			// Update user history
-			histColl := a.Database.Collection(historiesColl)
-			histColl.FindOneAndReplace(
-				context.TODO() , 
-				bson.M{"user_id" : conn.UserId} , 
-				userHistory,
-			);
-			// This gives error when the user opens the socket and wants to see new products
-
-			// store an array of the product ids of the recommended products
-			// products which need to be retrieved from database
-			toFetch := userHistory.Products;
-
-			// Update user history
-			coll := a.Database.Collection(historiesColl)
-			coll.FindOneAndReplace(
-				context.TODO() , 
-				bson.M{"user_id" : conn.UserId} , 
-				userHistory,
-			);
-
-			// products to display to user
-			var products []internal.Product
-			for i := userHistory.Index;i < len(toFetch);i++ {
-				
-				var product internal.Product
-				productId := toFetch[i];
-
-				a.Database.Get(
-					context.TODO(), 
-					"products",
-					bson.M{"product_id" : productId},
-					&product,
-				)
-
-				products = append(products , product)
-			}
-
-			// shorten products to less or equal to three items
-			if len(products) >= 3{
-				products = products[0:3]
-			}
-			data , err := json.Marshal(products)
-			if err != nil {
-				ws.Message(
-					conn,
-					http.StatusInternalServerError,
-					"Failed to encode products into json",
-				)
-				return;
-			}
-
-			log.Println("action =" , action)
-			log.Println("products.length =" , len(products))
-			ws.Send(conn.UserId , data);
-
-			return;
-		}
-
-		// by using toRecommend reduces the number of operations
-		recProducts , err := a.Recommend(2);
-		if err != nil {
-			ws.Message(
-				conn,
-				http.StatusInternalServerError,
-				"Failed to recommend products",
-			)
-			return;
-		}
-
-		// store an array of the product ids of the recommended products
-		productIds := userHistory.Products
-		for i := 0;i < len(recProducts);i++ {
-			productIds = append(productIds, recProducts[i].ProductID)
-		}
-
-
-		// products which need to be retrieved from database
-		toFetch := userHistory.Products;
-
-		userHistory.Products = productIds; // updated ids
-
-
-		// Update user history
-		coll := a.Database.Collection(historiesColl)
-		coll.FindOneAndReplace(
-			context.TODO() , 
-			bson.M{"user_id" : conn.UserId} , 
-			userHistory,
-		);
-
-		// products to display to user
-		var products []internal.Product
-		for i := userHistory.Index;i < len(toFetch);i++ {
-			
-			var product internal.Product
-			productId := toFetch[i];
-
-			a.Database.Get(
-				context.TODO(), 
-				"products",
-				bson.M{"product_id" : productId},
-				&product,
-			)
-
-			products = append(products , product)
-		}
-
-		products = append(products , recProducts...)
-		// shorten products to less or equal to three items
-		if len(products) >= 3{
-			products = products[0:3]
-		}
-		data , err := json.Marshal(products)
-		if err != nil {
-			ws.Message(
-				conn,
-				http.StatusInternalServerError,
-				"Failed to encode products into json",
-			)
-			return;
-		}
-
-		log.Println("WSFEED Open : products length =" , len(products))
-
-		ws.Send(conn.UserId , data);
+	data , err := json.Marshal(products)
+	if err != nil {
+		ws.Message(
+			conn,
+			http.StatusInternalServerError,
+			"Failed to encode products data into JSON",
+		)
 	}
 
-	
-
+	ws.Send(conn.UserId , data)
 }
 
 
@@ -368,7 +197,7 @@ func (a *App) handleSwipes(
 	action internal.Action,
 ){
 
-	data := &internal.Action{
+	actionData := &internal.Action{
 		UserID : conn.UserId,
 		ProductID: action.ProductID,
 		ActionType : action.ActionType,
@@ -377,33 +206,7 @@ func (a *App) handleSwipes(
 	}
 	log.Println("handling swipe")
 
-	// retrieve user's recommendation history
-	var userHistory internal.UserHistory
-	found , err := a.Database.Get(
-		context.TODO() , 
-		historiesColl , 
-		bson.M{"user_id" : conn.UserId} , 
-		&userHistory,
-	)
-	if err != nil{ // internal error in database
-		ws.Message(
-			conn ,
-			http.StatusInternalServerError , 
-			"Failed to retrieve user history",
-		);
-		return;
-	}
-	if !found { // no user history
-		ws.Message(
-			conn,
-			http.StatusBadRequest,
-			"First send 'open' message to websocket",
-		)
-		return;
-	}
-
-
-	err = a.Database.Store(context.TODO() , actionsColl , data)
+	err := a.Database.Store(context.TODO() , actionsColl , actionData)
 	if err != nil {
 		ws.Message(
 			conn,
@@ -413,137 +216,25 @@ func (a *App) handleSwipes(
 		return;
 	}
 
-	userHistory.Index += 1; // update the index 
-
-
-	// if there are more than 3 items in user history after index return
-	notSeen := len(userHistory.Products) - userHistory.Index
-	if notSeen > 2 {
-		// Update user history
-		histColl := a.Database.Collection(historiesColl)
-		histColl.FindOneAndReplace(
-			context.TODO() , 
-			bson.M{"user_id" : conn.UserId} , 
-			userHistory,
-		);
-		// This gives error when the user opens the socket and wants to see new products
-
-		// store an array of the product ids of the recommended products
-		// products which need to be retrieved from database
-		toFetch := userHistory.Products;
-
-		// Update user history
-		coll := a.Database.Collection(historiesColl)
-		coll.FindOneAndReplace(
-			context.TODO() , 
-			bson.M{"user_id" : conn.UserId} , 
-			userHistory,
-		);
-
-		// products to display to user
-		var products []internal.Product
-		for i := userHistory.Index;i < len(toFetch);i++ {
-			
-			var product internal.Product
-			productId := toFetch[i];
-
-			a.Database.Get(
-				context.TODO(), 
-				"products",
-				bson.M{"product_id" : productId},
-				&product,
-			)
-
-			products = append(products , product)
-		}
-
-		// shorten products to less or equal to three items
-		if len(products) >= 3{
-			products = products[0:3]
-		}
-		data , err := json.Marshal(products)
-		if err != nil {
-			ws.Message(
-				conn,
-				http.StatusInternalServerError,
-				"Failed to encode products into json",
-			)
-			return;
-		}
-
-		log.Println("action =" , action)
-		log.Println("WSFeed Swipe, Products length =" , len(products))
-		ws.Send(conn.UserId , data);
-
-		return;
-	}
-
-	// by using toRecommend reduces the number of operations
-	recProducts , err := a.Recommend(2);
+	products , err := a.RecommendWithQuery(action);
 	if err != nil {
 		ws.Message(
 			conn,
 			http.StatusInternalServerError,
-			"Failed to recommend products",
-		)
+			"Failed to get product recommendations",
+		);
 		return;
 	}
 
-	// store an array of the product ids of the recommended products
-	productIds := userHistory.Products
-	for i := 0;i < len(recProducts);i++ {
-		productIds = append(productIds, recProducts[i].ProductID)
-	}
-
-
-	// products which need to be retrieved from database
-	toFetch := userHistory.Products;
-
-	userHistory.Products = productIds; // updated ids
-
-
-	// Update user history
-	coll := a.Database.Collection(historiesColl)
-	coll.FindOneAndReplace(
-		context.TODO() , 
-		bson.M{"user_id" : conn.UserId} , 
-		userHistory,
-	);
-
-	// products to display to user
-	var products []internal.Product
-	for i := userHistory.Index;i < len(toFetch);i++ {
-		
-		var product internal.Product
-		productId := toFetch[i];
-
-		a.Database.Get(
-			context.TODO(), 
-			"products",
-			bson.M{"product_id" : productId},
-			&product,
-		)
-
-		products = append(products , product)
-	}
-
-	products = append(products , recProducts...)
-	// shorten products to less or equal to three items
-	if len(products) >= 3{
-		products = products[0:3]
-	}
-	toSend , err := json.Marshal(products)
+	data , err := json.Marshal(products)
 	if err != nil {
 		ws.Message(
 			conn,
 			http.StatusInternalServerError,
-			"Failed to encode products into json",
+			"Failed to encode products data into JSON",
 		)
-		return;
 	}
 
-	log.Println("WSFEED Swipes : products length =" , len(products))
-
-	ws.Send(conn.UserId , toSend);
+	ws.Send(conn.UserId , data)
 }
 
