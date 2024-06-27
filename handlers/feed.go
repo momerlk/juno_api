@@ -124,9 +124,6 @@ func (a *App) handleOpen(
 	conn *internal.WSConnection,
 	action internal.Action,
 ){
-	if action.ActionType != "open" {
-		return
-	}
 
 	// retrieve user's recommendation history
 	var userHistory internal.UserHistory
@@ -137,6 +134,7 @@ func (a *App) handleOpen(
 		&userHistory,
 	)
 	if err != nil { // internal error in database
+		log.Println("WSFeed : failed to retrieve user history, userid =" , conn.UserId)
 		ws.Message(
 			conn ,
 			http.StatusInternalServerError , 
@@ -147,6 +145,7 @@ func (a *App) handleOpen(
 
 
 	if !found { // IF FIRST TIME USER
+		log.Println("WSFeed : first time user, userid =" , conn.UserId)
 		recProducts , err := a.Recommend(3);
 		if err != nil {
 			ws.Message(
@@ -220,11 +219,24 @@ func (a *App) handleOpen(
 
 	} else { // NOT A FIRST TIME USER
 		userHistory.Index += 1; // update the index 
-
+		log.Println("WSFeed : not first time user, userid =" , conn.UserId)
 
 		// if there are more than 3 items in user history after index return
 		notSeen := len(userHistory.Products) - userHistory.Index
 		if notSeen > 2 {
+			// Update user history
+			histColl := a.Database.Collection(historiesColl)
+			histColl.FindOneAndReplace(
+				context.TODO() , 
+				bson.M{"user_id" : conn.UserId} , 
+				userHistory,
+			);
+			// This gives error when the user opens the socket and wants to see new products
+
+			// store an array of the product ids of the recommended products
+			// products which need to be retrieved from database
+			toFetch := userHistory.Products;
+
 			// Update user history
 			coll := a.Database.Collection(historiesColl)
 			coll.FindOneAndReplace(
@@ -232,6 +244,40 @@ func (a *App) handleOpen(
 				bson.M{"user_id" : conn.UserId} , 
 				userHistory,
 			);
+
+			// products to display to user
+			var products []internal.Product
+			for i := userHistory.Index;i < len(toFetch);i++ {
+				
+				var product internal.Product
+				productId := toFetch[i];
+
+				a.Database.Get(
+					context.TODO(), 
+					"products",
+					bson.M{"product_id" : productId},
+					&product,
+				)
+
+				products = append(products , product)
+			}
+
+			// shorten products to less or equal to three items
+			if len(products) >= 3{
+				products = products[0:3]
+			}
+			data , err := json.Marshal(products)
+			if err != nil {
+				ws.Message(
+					conn,
+					http.StatusInternalServerError,
+					"Failed to encode products into json",
+				)
+				return;
+			}
+
+
+			ws.Send(conn.UserId , data);
 
 			return;
 		}

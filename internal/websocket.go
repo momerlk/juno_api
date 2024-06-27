@@ -11,6 +11,28 @@ import (
 	"github.com/gobwas/ws/wsutil"
 )
 
+func ParseTokenString(tokenString string) (jwt.MapClaims , bool){
+	var tokenClaims jwt.MapClaims
+
+	// Parse the token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		key := Getenv("JWT_KEY")
+		return []byte(key) , nil
+	})
+	if err != nil {
+		return nil , false
+	}
+
+	// Check if the token is valid and not expired
+	if claims , ok := token.Claims.(jwt.MapClaims); !ok || !token.Valid {
+		return nil , false
+	} else {
+		tokenClaims = claims
+	}
+
+	return tokenClaims , true;
+}
+
 func Verify(w http.ResponseWriter , r *http.Request) (jwt.MapClaims , bool) {
 	tokenString := r.Header.Get("Authorization")
 	if tokenString == "" {
@@ -114,8 +136,11 @@ func (socket *WebSocket) Start(onRead func(websocket *WebSocket, conn *WSConnect
 }
 
 func (socket *WebSocket) ServeHTTP(w http.ResponseWriter , r *http.Request){
-	claims , ok := Verify(w , r)
+	// did not use internal.Verify because websockets don't support headers on clients such as react native
+	token := r.URL.Query().Get("token");
+	claims , ok := ParseTokenString(token)
 	if !ok {
+		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
