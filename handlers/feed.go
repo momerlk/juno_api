@@ -13,7 +13,6 @@ import (
 	"juno.api/internal"
 )
 
-const historiesColl = "histories"
 const actionsColl = "actions"
 
 
@@ -47,7 +46,7 @@ func (a *App) RecommendWithQuery(action internal.Action) ([]internal.Product , e
 	log.Println("filter =" , action.Query.Filter)
 	log.Println("text =" , action.Query.Text)
 	if action.Query.Filter != nil  && action.Query.Text == "" {
-		n := 2;
+		n := 5;
 
 		// Construct the aggregation pipeline
 		pipeline := bson.A{
@@ -69,6 +68,15 @@ func (a *App) RecommendWithQuery(action internal.Action) ([]internal.Product , e
 		err = cur.All(context.TODO(), &results)
 		if err != nil {
 			return nil, err
+		}
+
+		if len(results) <= 2 {
+			// standard recommendations
+			recs , err := a.Recommend(4);
+			if err != nil {
+				return nil , err;
+			}
+			results = append(results , recs...);
 		}
 
 		return results, nil		
@@ -128,8 +136,8 @@ func (a *App) RecommendWithQuery(action internal.Action) ([]internal.Product , e
 		return products, nil;
 	}
 
-
-	return nil , nil;
+	// standard feed
+	return a.Recommend(5);
 }
 
 // handle undo action

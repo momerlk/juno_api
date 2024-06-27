@@ -229,6 +229,7 @@ func (a *App) Recommend(n int) ([]internal.Product, error) {
 		return nil , err
 	}
 
+
 	return results , nil
 }
 

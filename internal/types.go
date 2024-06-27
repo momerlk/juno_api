@@ -32,7 +32,7 @@ type UserHistory struct {
 type Product struct {
     ProductID    string              `json:"product_id" bson:"product_id"`
     ProductURL   string              `json:"product_url" bson:"product_url"`
-    ShopifyID    int64           	 `json:"shopify_id" bson:"shopify_id"`
+    ShopifyID    string           	 `json:"shopify_id" bson:"shopify_id"`
     Handle       string              `json:"handle" bson:"handle"`
     Title        string              `json:"title" bson:"title"`
     Vendor       string              `json:"vendor" bson:"vendor"`
