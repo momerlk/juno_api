@@ -70,13 +70,16 @@ func (a *App) handleUndo(
 		return;
 	}
 
+	if userHistory.Index < 2 {
+		return;
+	}
+
 	userHistory.Index = userHistory.Index - 1;
 
 	// products which need to be retrieved from database
 	toFetch := userHistory.Products;
 	var toFetchLen int
 	if len(toFetch) <= 3 { toFetchLen = len(toFetch) } else { toFetchLen = 3 }
-
 
 	// Update user history
 	coll := a.Database.Collection(historiesColl)
@@ -88,10 +91,9 @@ func (a *App) handleUndo(
 
 	// products to display to user
 	var products []internal.Product
-	for i := userHistory.Index;i < toFetchLen;i++ {
-		
+	for i := userHistory.Index;i < userHistory.Index + toFetchLen;i++ {
 		var product internal.Product
-		productId := toFetch[i];
+		productId := userHistory.Products[i];
 
 		a.Database.Get(
 			context.TODO(), 
@@ -113,7 +115,7 @@ func (a *App) handleUndo(
 		return;
 	}
 
-
+	log.Println("WSFEED UNDO : products length =" , len(products))
 	ws.Send(conn.UserId , data);
 }
 
@@ -207,6 +209,8 @@ func (a *App) handleOpen(
 			)
 			return;
 		}
+		log.Println("WSFEED Open : products length =" , len(products))
+
 		sent , err := ws.Send(conn.UserId , data);
 		if err != nil {
 			log.Printf("Failed to write to websocket , err = %v\n",err)
@@ -276,7 +280,8 @@ func (a *App) handleOpen(
 				return;
 			}
 
-
+			log.Println("action =" , action)
+			log.Println("products.length =" , len(products))
 			ws.Send(conn.UserId , data);
 
 			return;
@@ -346,6 +351,7 @@ func (a *App) handleOpen(
 			return;
 		}
 
+		log.Println("WSFEED Open : products length =" , len(products))
 
 		ws.Send(conn.UserId , data);
 	}
@@ -369,6 +375,7 @@ func (a *App) handleSwipes(
 		ActionID: uuid.NewString(),
 		ActionTimestamp: time.Now().String(),
 	}
+	log.Println("handling swipe")
 
 	// retrieve user's recommendation history
 	var userHistory internal.UserHistory
@@ -413,12 +420,60 @@ func (a *App) handleSwipes(
 	notSeen := len(userHistory.Products) - userHistory.Index
 	if notSeen > 2 {
 		// Update user history
+		histColl := a.Database.Collection(historiesColl)
+		histColl.FindOneAndReplace(
+			context.TODO() , 
+			bson.M{"user_id" : conn.UserId} , 
+			userHistory,
+		);
+		// This gives error when the user opens the socket and wants to see new products
+
+		// store an array of the product ids of the recommended products
+		// products which need to be retrieved from database
+		toFetch := userHistory.Products;
+
+		// Update user history
 		coll := a.Database.Collection(historiesColl)
 		coll.FindOneAndReplace(
 			context.TODO() , 
 			bson.M{"user_id" : conn.UserId} , 
 			userHistory,
 		);
+
+		// products to display to user
+		var products []internal.Product
+		for i := userHistory.Index;i < len(toFetch);i++ {
+			
+			var product internal.Product
+			productId := toFetch[i];
+
+			a.Database.Get(
+				context.TODO(), 
+				"products",
+				bson.M{"product_id" : productId},
+				&product,
+			)
+
+			products = append(products , product)
+		}
+
+		// shorten products to less or equal to three items
+		if len(products) >= 3{
+			products = products[0:3]
+		}
+		data , err := json.Marshal(products)
+		if err != nil {
+			ws.Message(
+				conn,
+				http.StatusInternalServerError,
+				"Failed to encode products into json",
+			)
+			return;
+		}
+
+		log.Println("action =" , action)
+		log.Println("WSFeed Swipe, Products length =" , len(products))
+		ws.Send(conn.UserId , data);
 
 		return;
 	}
@@ -487,6 +542,7 @@ func (a *App) handleSwipes(
 		return;
 	}
 
+	log.Println("WSFEED Swipes : products length =" , len(products))
 
 	ws.Send(conn.UserId , toSend);
 }
