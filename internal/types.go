@@ -40,7 +40,7 @@ type Product struct {
     ImageURL     string              `json:"image_url" bson:"image_url"`
     Description  string              `json:"description" bson:"description"`
     BodyHTML     string              `json:"body_html" bson:"body_html"`
-    Price        string              `json:"price" bson:"price"`
+    Price        uint64              `json:"price" bson:"price"`
     Currency     string              `json:"currency" bson:"currency"`
     Options      []ProductOption     `json:"options" bson:"options"`
     Tags         []string            `json:"tags" bson:"tags"`

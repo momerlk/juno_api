@@ -326,7 +326,7 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 	// Construct the query with fuzzy parameters
 	query :=  bson.D{
 		{Key: "$search", Value: bson.D{
-			{Key: "index", Value: "desc"}, // Ensure this matches your index name
+			{Key: "index", Value: "aisearch"}, // Ensure this matches the index name
 			{Key: "text", Value: bson.D{
 				{Key: "query", Value: queryString},
 				{Key: "path", Value: bson.D{
