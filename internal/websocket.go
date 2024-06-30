@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	jwt "github.com/golang-jwt/jwt/v5"
 
@@ -111,6 +112,9 @@ func (socket *WebSocket) Start(onRead func(websocket *WebSocket, conn *WSConnect
 		connections, err := socket.epoller.Wait()
 		
 		if err != nil {
+			if strings.Contains(err.Error() , "interrupted system call"){
+				continue
+			}
 			log.Printf("Failed to epoll wait %v", err)
 			continue
 		}

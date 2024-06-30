@@ -10,7 +10,6 @@ type Action struct {
     ActionType     	    string          `json:"action_type" bson:"action_type"`
     ActionTimestamp     string          `json:"action_timestamp" bson:"action_timestamp"`
     ProductID      	    string          `json:"product_id" bson:"product_id"`
-    DataType            string          `json:"data_type" bson:"data_type"` 
     Query               ActionQuery     `json:"query" bson:"query"` 
 }
 
@@ -39,7 +38,6 @@ type Product struct {
     Category     string              `json:"category" bson:"category"`
     ImageURL     string              `json:"image_url" bson:"image_url"`
     Description  string              `json:"description" bson:"description"`
-    BodyHTML     string              `json:"body_html" bson:"body_html"`
     Price        uint64              `json:"price" bson:"price"`
     Currency     string              `json:"currency" bson:"currency"`
     Options      []ProductOption     `json:"options" bson:"options"`

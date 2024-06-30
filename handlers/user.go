@@ -205,12 +205,46 @@ func (a *App) Liked(w http.ResponseWriter , r *http.Request){
 
 	userId := claims["user_id"]
 
-	var product []interface{}
-	a.Database.Get(r.Context(), "products" , bson.M{"user_id" : userId} , &product)
+	// TODO : replace with internal.Action
+	var actions [](map[string]interface{})
+	cursor , err := a.Database.Collection(actionsColl).Find(
+		r.Context(), 
+		bson.M{"user_id" : userId, "action_type" : "liked"} , 
+	)
+	if err != nil {
+		log.Println("GET /liked error =" , err)
+		http.Error(w , "Failed to retrieve user actions" , http.StatusInternalServerError);
+		return;
+	}
+
+	err = cursor.All(r.Context() , &actions);
+	if err != nil {
+		log.Println("GET /liked error =" , err)
+		http.Error(w , "Failed to retrieve user actions" , http.StatusInternalServerError);
+		return;
+	}
+	defer cursor.Close(r.Context());
+
+
+	var products []internal.Product
+	for _, action := range actions {
+		var product internal.Product
+
+		ok , err := a.Database.Get(
+			r.Context() , "products" , 
+			bson.M{"product_id" : action["product_id"]} , 
+			&product,
+		);
+		if err != nil || !ok{
+			continue;
+		}
+
+		products = append(products, product);
+	}
 
 	// TODO : Retrieve all the products data from their ids
 
-	json.NewEncoder(w).Encode(product)
+	json.NewEncoder(w).Encode(products)
 }
 
 func (a *App) Recommend(n int) ([]internal.Product, error) {
@@ -336,7 +370,7 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 		}},
 	}
 
-	limitStage := bson.D{{Key: "$limit", Value: 10}}
+	limitStage := bson.D{{Key: "$limit", Value: 50}}
 
 
 	// Perform the search
@@ -357,5 +391,28 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 
 
 	// Encode the result as JSON and write to response
+	json.NewEncoder(w).Encode(products)
+}
+
+// query the products
+func (a *App) QueryProducts(w http.ResponseWriter , r *http.Request){
+	if r.Method != http.MethodPost {
+		a.ClientError(w , http.StatusMethodNotAllowed);
+		return;
+	}
+
+	var body internal.ActionQuery
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		http.Error(w , "Failed to decode body" , http.StatusBadRequest);
+		return
+	}
+
+	products , err := a.RecommendWithQuery(internal.Action{Query : body} , 50);
+	if err != nil {
+		http.Error(w , "Failed to get query" , http.StatusInternalServerError)
+		return;
+	}
+
 	json.NewEncoder(w).Encode(products)
 }

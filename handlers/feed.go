@@ -33,8 +33,6 @@ func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data [
 	switch action.ActionType {
 	case "open" :
 		a.handleOpen(ws , conn, action);
-	case "undo":
-		a.handleUndo(ws , conn, action);
 	default :
 		a.handleSwipes(ws , conn, action);
 	}
@@ -42,11 +40,11 @@ func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data [
 	return err
 }
 
-func (a *App) RecommendWithQuery(action internal.Action) ([]internal.Product , error){
-	log.Println("filter =" , action.Query.Filter)
-	log.Println("text =" , action.Query.Text)
+func (a *App) RecommendWithQuery(action internal.Action , n int) ([]internal.Product , error){
+	//log.Println("filter =" , action.Query.Filter)
+	//log.Println("text =" , action.Query.Text)
+	
 	if action.Query.Filter != nil  && action.Query.Text == "" {
-		n := 5;
 
 		// Construct the aggregation pipeline
 		pipeline := bson.A{
@@ -69,10 +67,11 @@ func (a *App) RecommendWithQuery(action internal.Action) ([]internal.Product , e
 		if err != nil {
 			return nil, err
 		}
-
-		if len(results) <= 2 {
-			// standard recommendations
-			recs , err := a.Recommend(4);
+		defer cur.Close(context.TODO());
+		
+		remainingProducts := n-len(results);
+		if remainingProducts > 2 {
+			recs , err := a.Recommend(remainingProducts);
 			if err != nil {
 				return nil , err;
 			}
@@ -82,12 +81,11 @@ func (a *App) RecommendWithQuery(action internal.Action) ([]internal.Product , e
 		return results, nil		
 	}
 
-
 	if action.Query.Text != "" {
 		// Construct the query with fuzzy parameters
 		query :=  bson.D{
 			{Key: "$search", Value: bson.D{
-				{Key: "index", Value: "desc"}, // Ensure this matches your index name
+				{Key: "index", Value: "aisearch"}, // Ensure this matches your index name
 				{Key: "text", Value: bson.D{
 					{Key: "query", Value: action.Query.Text},
 					{Key: "path", Value: bson.D{
@@ -97,8 +95,7 @@ func (a *App) RecommendWithQuery(action internal.Action) ([]internal.Product , e
 			}},
 		}
 
-		limitStage := bson.D{{Key: "$limit", Value: 10}}
-
+		limitStage := bson.D{{Key: "$limit", Value: n}}
 
 		// Perform the search
 		collection := a.Database.Collection("products")
@@ -127,45 +124,25 @@ func (a *App) RecommendWithQuery(action internal.Action) ([]internal.Product , e
 		}
 		defer cursor.Close(context.TODO())
 
-
-
 		var products []internal.Product
 		if err = cursor.All(context.TODO(), &products); err != nil {
 			return nil , err;
 		}	
+
+		remainingProducts := n-len(products);
+		if remainingProducts > 2 {
+			recs , err := a.Recommend(remainingProducts);
+			if err != nil {
+				return nil , err;
+			}
+			products = append(products , recs...);
+		}
+
 		return products, nil;
 	}
 
 	// standard feed
-	return a.Recommend(5);
-}
-
-// handle undo action
-func (a *App) handleUndo(
-	ws *internal.WebSocket,
-	conn *internal.WSConnection,
-	action internal.Action,
-){
-	products , err := a.RecommendWithQuery(action);
-	if err != nil {
-		ws.Message(
-			conn,
-			http.StatusInternalServerError,
-			"Failed to get product recommendations",
-		);
-		return;
-	}
-
-	data , err := json.Marshal(products)
-	if err != nil {
-		ws.Message(
-			conn,
-			http.StatusInternalServerError,
-			"Failed to encode products data into JSON",
-		)
-	}
-
-	ws.Send(conn.UserId , data)
+	return a.Recommend(n);
 }
 
 
@@ -175,7 +152,7 @@ func (a *App) handleOpen(
 	conn *internal.WSConnection,
 	action internal.Action,
 ){
-	products , err := a.RecommendWithQuery(action);
+	products , err := a.RecommendWithQuery(action , 10);
 	if err != nil {
 		ws.Message(
 			conn,
@@ -224,7 +201,7 @@ func (a *App) handleSwipes(
 		return;
 	}
 
-	products , err := a.RecommendWithQuery(action);
+	products , err := a.RecommendWithQuery(action , 4);
 	if err != nil {
 		ws.Message(
 			conn,
