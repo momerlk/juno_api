@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
+	"unicode"
 
 	"encoding/json"
 
@@ -18,10 +20,25 @@ import (
 
 const productsColl = "products"
 
+type FilterValue struct {
+	Label 				string 				`json:"label" bson:"label"`
+	Value 				string 				`json:"value" bson:"value"`
+}
 type FilterResponse struct {
-	Brands []string `json:"brands" bson:"brands"`
+	Brands 				[]FilterValue 		`json:"brands" bson:"brands"`
 }
 
+func CapitalizeWords(s string) string {
+	words := strings.Fields(s) // Split the string into words
+	for i, word := range words {
+		runes := []rune(word)
+		if len(runes) > 0 {
+			runes[0] = unicode.ToUpper(runes[0])
+			words[i] = string(runes)
+		}
+	}
+	return strings.Join(words, " ") // Join the words back into a single string
+}
 
 func (a *App) Filter(w http.ResponseWriter, r *http.Request) {
 	// no need for verification in this field
@@ -36,8 +53,14 @@ func (a *App) Filter(w http.ResponseWriter, r *http.Request) {
 		http.Error(w , "Failed to get distinct brand values" , http.StatusInternalServerError);
 		return
 	}
+	
+	filter := &FilterResponse{}
+	for _ , brand := range data {
+		label := CapitalizeWords(strings.ReplaceAll(brand.(string) , "_" , " "))
+		filter.Brands = append(filter.Brands, FilterValue{Label : label , Value : brand.(string)})
+	}
 
-	json.NewEncoder(w).Encode(data);
+	json.NewEncoder(w).Encode(filter);
 }
 
 func (a *App) Liked(w http.ResponseWriter, r *http.Request) {
