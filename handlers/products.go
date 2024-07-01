@@ -196,10 +196,12 @@ func (a *App) Cart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	productsByVendor := make(map[string]internal.Product)
+	productsByVendor := make(map[string][]internal.Product)
 
 	for _, action := range actions {
 		var product internal.Product
+
+		arr := productsByVendor[product.Vendor]
 
 		found, err := a.Database.Get(r.Context(), productsColl, bson.M{"product_id": action.ProductID}, &product)
 		if !found {
@@ -209,8 +211,9 @@ func (a *App) Cart(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to get retrieve products from database", http.StatusInternalServerError)
 			return
 		}
+		arr = append(arr,product)
 
-		productsByVendor[product.Vendor] = product
+		productsByVendor[product.Vendor]  = arr
 
 	}
 
