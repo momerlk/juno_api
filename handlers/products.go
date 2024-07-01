@@ -40,6 +40,7 @@ func CapitalizeWords(s string) string {
 	return strings.Join(words, " ") // Join the words back into a single string
 }
 
+// GET /filter
 func (a *App) Filter(w http.ResponseWriter, r *http.Request) {
 	// no need for verification in this field
 	if r.Method != http.MethodGet {
@@ -63,6 +64,8 @@ func (a *App) Filter(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(filter);
 }
 
+
+// GET /liked
 func (a *App) Liked(w http.ResponseWriter, r *http.Request) {
 	claims, ok := internal.Verify(w, r)
 	if !ok {
