@@ -62,7 +62,10 @@ func main(){
 
 	mux.HandleFunc("/products" , app.Products); // GET get top n product recommendations 
 	mux.HandleFunc("/search" , app.SearchProducts); // GET : search products database given a query
-	mux.HandleFunc("/query" , app.QueryProducts);
+	mux.HandleFunc("/query" , app.QueryProducts); // GET : for more advanced mongodb based query search
+	
+
+	mux.HandleFunc("/filter" , app.Filter); // GET : get all values required for feed filter
 
 	mux.HandleFunc("/liked" , app.Liked); // GET : get all products liked by user
 	mux.HandleFunc("/cart" , app.Cart); // GET : Get user's shopping cart

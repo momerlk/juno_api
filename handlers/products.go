@@ -8,7 +8,6 @@ import (
 
 	"encoding/json"
 
-
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
@@ -17,13 +16,32 @@ import (
 	"net/http"
 )
 
-func (a *App) Filter(w http.ResponseWriter , r *http.Request){
-	
+const productsColl = "products"
+
+type FilterResponse struct {
+	Brands []string `json:"brands" bson:"brands"`
 }
 
 
-func (a *App) Liked(w http.ResponseWriter , r *http.Request){
-	claims , ok := internal.Verify(w , r);
+func (a *App) Filter(w http.ResponseWriter, r *http.Request) {
+	// no need for verification in this field
+	if r.Method != http.MethodGet {
+		a.ClientError(w , http.StatusMethodNotAllowed);
+		return;
+	}
+
+	// getting all the unique brand values in the database
+	data , err := a.Database.Collection(productsColl).Distinct(r.Context() , "vendor" , bson.D{})
+	if err != nil {
+		http.Error(w , "Failed to get distinct brand values" , http.StatusInternalServerError);
+		return
+	}
+
+	json.NewEncoder(w).Encode(data);
+}
+
+func (a *App) Liked(w http.ResponseWriter, r *http.Request) {
+	claims, ok := internal.Verify(w, r)
 	if !ok {
 		return
 	}
@@ -31,26 +49,23 @@ func (a *App) Liked(w http.ResponseWriter , r *http.Request){
 	userId := claims["user_id"]
 
 	var actions []internal.Action
-	cursor , err := a.Database.Collection(actionsColl).Find(
-		r.Context(), 
-		bson.M{"user_id" : userId, "action_type" : internal.LikeAction} , 
+	cursor, err := a.Database.Collection(actionsColl).Find(
+		r.Context(),
+		bson.M{"user_id": userId, "action_type": internal.LikeAction},
 	)
 	if err != nil {
-		log.Println("GET /liked error =" , err)
-		http.Error(w , "Failed to retrieve user actions" , http.StatusInternalServerError);
-		return;
+		log.Println("GET /liked error =", err)
+		http.Error(w, "Failed to retrieve user actions", http.StatusInternalServerError)
+		return
 	}
 
-
-	err = cursor.All(r.Context() , &actions);
+	err = cursor.All(r.Context(), &actions)
 	if err != nil {
-		log.Println("GET /liked error =" , err)
-		http.Error(w , "Failed to retrieve user actions" , http.StatusInternalServerError);
-		return;
+		log.Println("GET /liked error =", err)
+		http.Error(w, "Failed to retrieve user actions", http.StatusInternalServerError)
+		return
 	}
-	defer cursor.Close(r.Context());
-
-
+	defer cursor.Close(r.Context())
 
 	var products []internal.Product
 	var productIDs []string
@@ -62,7 +77,7 @@ func (a *App) Liked(w http.ResponseWriter , r *http.Request){
 
 	// Fetch all products at once using the $in operator
 	filter := bson.M{"product_id": bson.M{"$in": productIDs}}
-	cursor, err = a.Database.Collection("products").Find(r.Context(), filter)
+	cursor, err = a.Database.Collection(productsColl).Find(r.Context(), filter)
 	if err != nil {
 		// Handle error
 		log.Println("Error fetching products:", err)
@@ -76,7 +91,6 @@ func (a *App) Liked(w http.ResponseWriter , r *http.Request){
 		return
 	}
 
-
 	// TODO : Retrieve all the products data from their ids
 
 	json.NewEncoder(w).Encode(products)
@@ -84,107 +98,104 @@ func (a *App) Liked(w http.ResponseWriter , r *http.Request){
 
 func (a *App) Recommend(n int) ([]internal.Product, error) {
 	// get a cursor over the aggregation of products
-	cur , err := a.Database.Collection("products").Aggregate(
+	cur, err := a.Database.Collection(productsColl).Aggregate(
 		context.TODO(),
 		bson.A{bson.M{"$sample": bson.M{"size": n}}},
 	)
 	if err != nil {
-		return nil,  err
+		return nil, err
 	}
 
 	var results []internal.Product
-	err = cur.All(context.TODO() , &results)
+	err = cur.All(context.TODO(), &results)
 	if err != nil {
-		return nil , err
+		return nil, err
 	}
 
-
-	return results , nil
+	return results, nil
 }
 
-
-func (a *App) Products(w http.ResponseWriter , r *http.Request){
-	_ , ok := internal.Verify(w , r);
+func (a *App) Products(w http.ResponseWriter, r *http.Request) {
+	_, ok := internal.Verify(w, r)
 	if !ok {
 		return
 	}
 
 	query_N := r.URL.Query().Get("n")
-	n , err := strconv.Atoi(query_N)
+	n, err := strconv.Atoi(query_N)
 	if err != nil {
-		http.Error(w , "Query parameter n is not a valid integer" , http.StatusBadRequest);
+		http.Error(w, "Query parameter n is not a valid integer", http.StatusBadRequest)
 		return
 	}
 
 	// get a cursor over the aggregation of products
-	cur , err := a.Database.Collection("products").Aggregate(
-		r.Context() , 
+	cur, err := a.Database.Collection(productsColl).Aggregate(
+		r.Context(),
 		bson.A{bson.M{"$sample": bson.M{"size": n}}},
 	)
 	if err != nil {
-		http.Error(w , fmt.Sprintf("Could not get aggregation of products, err : %v" , err.Error()) , http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Could not get aggregation of products, err : %v", err.Error()), http.StatusInternalServerError)
 		return
 	}
 
 	var results []internal.Product
-	err = cur.All(r.Context() , &results)
+	err = cur.All(r.Context(), &results)
 	if err != nil {
-		http.Error(w , fmt.Sprintf("Could not get aggregation of products, err : %v" , err.Error()) , http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Could not get aggregation of products, err : %v", err.Error()), http.StatusInternalServerError)
 		return
 	}
-	
+
 	json.NewEncoder(w).Encode(results)
 }
 
 // TODO : Group items by brand
-func (a *App) Cart(w http.ResponseWriter , r *http.Request){
+func (a *App) Cart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		a.ClientError(w , http.StatusMethodNotAllowed);
-		return;
+		a.ClientError(w, http.StatusMethodNotAllowed)
+		return
 	}
 
-	claims , ok := internal.Verify(w,r);
+	claims, ok := internal.Verify(w, r)
 	if !ok {
-		return;
+		return
 	}
 	userId := claims["user_id"]
 
-	actions , err := internal.Get[internal.Action](
-		r.Context() , &a.Database, actionsColl , 
-		bson.M{"user_id" : userId , "action_type" : internal.AddToCartAction},
-	);
+	actions, err := internal.Get[internal.Action](
+		r.Context(), &a.Database, actionsColl,
+		bson.M{"user_id": userId, "action_type": internal.AddToCartAction},
+	)
 	if err != nil {
-		a.ServerError(w , "CART" , err) // TODO : add error strings to server error
-		return;
+		a.ServerError(w, "CART", err) // TODO : add error strings to server error
+		return
 	}
-
 
 	productsByVendor := make(map[string]internal.Product)
 
-	for _ , action := range actions {
+	for _, action := range actions {
 		var product internal.Product
 
-		found , err := a.Database.Get(r.Context() , "products" , bson.M{"product_id" : action.ProductID} , &product);
-		if !found { continue }
+		found, err := a.Database.Get(r.Context(), productsColl, bson.M{"product_id": action.ProductID}, &product)
+		if !found {
+			continue
+		}
 		if err != nil {
-			http.Error(w , "Failed to get retrieve products from database" , http.StatusInternalServerError);
-			return;
+			http.Error(w, "Failed to get retrieve products from database", http.StatusInternalServerError)
+			return
 		}
 
-		productsByVendor[product.Vendor] = product;
+		productsByVendor[product.Vendor] = product
 
 	}
 
 	json.NewEncoder(w).Encode(productsByVendor)
 }
 
-
 func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		a.ClientError(w, http.StatusMethodNotAllowed)
 		return
 	}
-
 
 	queryString := r.URL.Query().Get("q")
 	if queryString == "" {
@@ -193,7 +204,7 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Construct the query with fuzzy parameters
-	query :=  bson.D{
+	query := bson.D{
 		{Key: "$search", Value: bson.D{
 			{Key: "index", Value: "aisearch"}, // Ensure this matches the index name
 			{Key: "text", Value: bson.D{
@@ -207,12 +218,11 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 
 	limitStage := bson.D{{Key: "$limit", Value: 50}}
 
-
 	// Perform the search
-	collection := a.Database.Collection("products")
-	cursor, err := collection.Aggregate(r.Context(), mongo.Pipeline{query , limitStage})
+	collection := a.Database.Collection(productsColl)
+	cursor, err := collection.Aggregate(r.Context(), mongo.Pipeline{query, limitStage})
 	if err != nil {
-		log.Println("Failed to perform search, err =" , err)
+		log.Println("Failed to perform search, err =", err)
 		http.Error(w, "Failed to perform search", http.StatusInternalServerError)
 		return
 	}
@@ -224,29 +234,28 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	// Encode the result as JSON and write to response
 	json.NewEncoder(w).Encode(products)
 }
 
 // query the products
-func (a *App) QueryProducts(w http.ResponseWriter , r *http.Request){
+func (a *App) QueryProducts(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		a.ClientError(w , http.StatusMethodNotAllowed);
-		return;
+		a.ClientError(w, http.StatusMethodNotAllowed)
+		return
 	}
 
 	var body internal.ActionQuery
 	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
-		http.Error(w , "Failed to decode body" , http.StatusBadRequest);
+		http.Error(w, "Failed to decode body", http.StatusBadRequest)
 		return
 	}
 
-	products , err := a.RecommendWithQuery(internal.Action{Query : body} , 50);
+	products, err := a.RecommendWithQuery(internal.Action{Query: body}, 50)
 	if err != nil {
-		http.Error(w , "Failed to get query" , http.StatusInternalServerError)
-		return;
+		http.Error(w, "Failed to get query", http.StatusInternalServerError)
+		return
 	}
 
 	json.NewEncoder(w).Encode(products)
