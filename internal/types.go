@@ -3,6 +3,10 @@ package internal
 import (
 )
 
+const LikeAction = "like"
+const DislikeAction = "dislike"
+const AddToCartAction = "added_to_cart"
+
 // Action represents an action performed by a user
 type Action struct {
     UserID         	    string          `json:"user_id" bson:"user_id"`

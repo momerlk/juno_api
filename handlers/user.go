@@ -208,16 +208,17 @@ func (a *App) Liked(w http.ResponseWriter , r *http.Request){
 	userId := claims["user_id"]
 
 	// TODO : replace with internal.Action
-	var actions [](map[string]interface{})
+	var actions []internal.Action
 	cursor , err := a.Database.Collection(actionsColl).Find(
 		r.Context(), 
-		bson.M{"user_id" : userId, "action_type" : "liked"} , 
+		bson.M{"user_id" : userId, "action_type" : internal.LikeAction} , 
 	)
 	if err != nil {
 		log.Println("GET /liked error =" , err)
 		http.Error(w , "Failed to retrieve user actions" , http.StatusInternalServerError);
 		return;
 	}
+
 
 	err = cursor.All(r.Context() , &actions);
 	if err != nil {
@@ -234,7 +235,7 @@ func (a *App) Liked(w http.ResponseWriter , r *http.Request){
 
 		ok , err := a.Database.Get(
 			r.Context() , "products" , 
-			bson.M{"product_id" : action["product_id"]} , 
+			bson.M{"product_id" : action.ProductID} , 
 			&product,
 		);
 		if err != nil || !ok{
@@ -318,7 +319,7 @@ func (a *App) Cart(w http.ResponseWriter , r *http.Request){
 
 	actions , err := internal.Get[internal.Action](
 		r.Context() , &a.Database, actionsColl , 
-		bson.M{"user_id" : userId , "action_type" : "added_to_cart"},
+		bson.M{"user_id" : userId , "action_type" : internal.AddToCartAction},
 	);
 	if err != nil {
 		a.ServerError(w , "CART" , err) // TODO : add error strings to server error
