@@ -207,7 +207,6 @@ func (a *App) Liked(w http.ResponseWriter , r *http.Request){
 
 	userId := claims["user_id"]
 
-	// TODO : replace with internal.Action
 	var actions []internal.Action
 	cursor , err := a.Database.Collection(actionsColl).Find(
 		r.Context(), 
@@ -229,21 +228,31 @@ func (a *App) Liked(w http.ResponseWriter , r *http.Request){
 	defer cursor.Close(r.Context());
 
 
+
 	var products []internal.Product
+	var productIDs []string
+
+	// Collect all product IDs from the actions
 	for _, action := range actions {
-		var product internal.Product
-
-		ok , err := a.Database.Get(
-			r.Context() , "products" , 
-			bson.M{"product_id" : action.ProductID} , 
-			&product,
-		);
-		if err != nil || !ok{
-			continue;
-		}
-
-		products = append(products, product);
+		productIDs = append(productIDs, action.ProductID)
 	}
+
+	// Fetch all products at once using the $in operator
+	filter := bson.M{"product_id": bson.M{"$in": productIDs}}
+	cursor, err = a.Database.Collection("products").Find(r.Context(), filter)
+	if err != nil {
+		// Handle error
+		log.Println("Error fetching products:", err)
+		return
+	}
+
+	// Iterate over the cursor and decode each product
+	if err = cursor.All(r.Context(), &products); err != nil {
+		// Handle error
+		log.Println("Error decoding products:", err)
+		return
+	}
+
 
 	// TODO : Retrieve all the products data from their ids
 
