@@ -174,7 +174,10 @@ func (a *App) Products(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(results)
 }
 
-// TODO : Group items by brand
+type CartItem struct {
+	Vendor 					string 					`json:"vendor" bson:"vendor"`
+	Items 					[]internal.Product		`json:"items" bson:"items"`
+}
 func (a *App) Cart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		a.ClientError(w, http.StatusMethodNotAllowed)
@@ -227,7 +230,15 @@ func (a *App) Cart(w http.ResponseWriter, r *http.Request) {
 		productsByVendor[product.Vendor]  = arr
 	}
 
-	json.NewEncoder(w).Encode(productsByVendor)
+	items := []CartItem{}
+	for vendor , products := range productsByVendor {
+		items = append(items , CartItem{
+			Vendor: vendor,
+			Items: products,
+		})
+	}
+
+	json.NewEncoder(w).Encode(items)
 }
 
 func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
