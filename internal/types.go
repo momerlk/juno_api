@@ -31,18 +31,29 @@ type UserHistory struct {
 type Product struct {
 	ProductID   string          `json:"product_id" bson:"product_id"`
 	ProductURL  string          `json:"product_url" bson:"product_url"`
-	ShopifyID   string          `json:"shopify_id" bson:"shopify_id"`
+	
+    ShopifyID   string          `json:"shopify_id" bson:"shopify_id"`
 	Handle      string          `json:"handle" bson:"handle"`
-	Title       string          `json:"title" bson:"title"`
+	
+    Title       string          `json:"title" bson:"title"`
 	Vendor      string          `json:"vendor" bson:"vendor"`
-	Category    string          `json:"category" bson:"category"`
+	
+    Category    string          `json:"category" bson:"category"`
+
 	ImageURL    string          `json:"image_url" bson:"image_url"`
+    Images      []string        `json:"images" bson:"images"`
+
+    // Variants    []interface{}   `json:"variants" bson:"variants"` // TODO : add proper variant type
+
 	Description string          `json:"description" bson:"description"`
-	Price       uint64          `json:"price" bson:"price"`
+	
+    Price       uint64          `json:"price" bson:"price"`
 	Currency    string          `json:"currency" bson:"currency"`
-	Options     []ProductOption `json:"options" bson:"options"`
+	
+    Options     []ProductOption `json:"options" bson:"options"`
 	Tags        []string        `json:"tags" bson:"tags"`
-	Available   bool            `json:"available" bson:"available"`
+	
+    Available   bool            `json:"available" bson:"available"`
 }
 
 // ProductOption represents a product option
