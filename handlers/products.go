@@ -198,23 +198,33 @@ func (a *App) Cart(w http.ResponseWriter, r *http.Request) {
 
 	productsByVendor := make(map[string][]internal.Product)
 
+	productIds := []string{}	
+
 	for _, action := range actions {
-		var product internal.Product
+		productIds = append(productIds, action.ProductID)
+	}
 
+	cursor , err := a.Database.Collection(productsColl).Find(
+		r.Context() , 
+		bson.M{"product_id" : bson.M{"$in" : productIds}},
+	)
+	if err != nil {
+		http.Error(w , "/cart failed to get products" , http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(r.Context())
+
+	var products []internal.Product
+	err = cursor.All(r.Context() , &products);
+	if err != nil {
+		http.Error(w , "/cart failed to decode products" , http.StatusInternalServerError)
+		return
+	}
+
+	for _ , product := range products {
 		arr := productsByVendor[product.Vendor]
-
-		found, err := a.Database.Get(r.Context(), productsColl, bson.M{"product_id": action.ProductID}, &product)
-		if !found {
-			continue
-		}
-		if err != nil {
-			http.Error(w, "Failed to get retrieve products from database", http.StatusInternalServerError)
-			return
-		}
 		arr = append(arr,product)
-
 		productsByVendor[product.Vendor]  = arr
-
 	}
 
 	json.NewEncoder(w).Encode(productsByVendor)
