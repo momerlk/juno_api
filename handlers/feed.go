@@ -29,6 +29,9 @@ func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data [
 
 	log.Printf("feed served to user id = %v, action = %v\n" , conn.UserId , action)
 
+	// TODO : Each product can have multiple ratings change that
+	// Make an entire user ratings portfolio
+
 
 	switch action.ActionType {
 	case "open" :
