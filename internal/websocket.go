@@ -150,6 +150,24 @@ func (socket *WebSocket) ServeHTTP(w http.ResponseWriter , r *http.Request){
 
 	userId := claims["user_id"].(string)
 
+	// TODO : not more than 5 devices on one account
+	// TODO : if you are using more than 1 websocket path then update this to 5*routes
+	connections := 0;
+	limit := 5;
+
+	// TODO : this linear loop will not scale for a million connections
+	for _ , conn := range socket.epoller.connections {
+		if conn.UserId == userId {
+			connections += 1;
+		}	
+	}
+	
+	if connections >= limit {
+		http.Error(w , "User cannot have more than 5 connections" , http.StatusForbidden)
+		return;
+	}
+
+	log.Printf("user %v using %v connections" , userId , connections+1);
 
 	// Upgrade connection
 	conn, _, _, err := ws.UpgradeHTTP(r, w)

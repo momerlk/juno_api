@@ -73,6 +73,8 @@ func (a *App) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO : not more than 5 devices on one account
+
 	var body SignInBody
 	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
