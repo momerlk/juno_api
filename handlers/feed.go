@@ -186,7 +186,6 @@ func (a *App) handleSwipes(
 		ActionID:        uuid.NewString(),
 		ActionTimestamp: time.Now().String(),
 	}
-	log.Println("handling swipe")
 
 	err := a.Database.Store(context.TODO(), actionsColl, actionData)
 	if err != nil {

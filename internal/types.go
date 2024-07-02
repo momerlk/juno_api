@@ -27,40 +27,46 @@ type UserHistory struct {
 	Index    int      `json:"index" bson:"index"`
 }
 
-// Product represents the structure of the JSON document
+// Product represents a product in the store
 type Product struct {
-	ProductID   string          `json:"product_id" bson:"product_id"`
-	ProductURL  string          `json:"product_url" bson:"product_url"`
-	
-    ShopifyID   string          `json:"shopify_id" bson:"shopify_id"`
-	Handle      string          `json:"handle" bson:"handle"`
-	
-    Title       string          `json:"title" bson:"title"`
-	Vendor      string          `json:"vendor" bson:"vendor"`
-	
-    Category    string          `json:"category" bson:"category"`
-
-	ImageURL    string          `json:"image_url" bson:"image_url"`
-    Images      []string        `json:"images" bson:"images"`
-
-    // Variants    []interface{}   `json:"variants" bson:"variants"` // TODO : add proper variant type
-
-	Description string          `json:"description" bson:"description"`
-	
-    Price       uint64          `json:"price" bson:"price"`
-	Currency    string          `json:"currency" bson:"currency"`
-	
-    Options     []ProductOption `json:"options" bson:"options"`
-	Tags        []string        `json:"tags" bson:"tags"`
-	
-    Available   bool            `json:"available" bson:"available"`
+    ProductID    string    `json:"product_id" bson:"product_id"`
+    ProductURL   string    `json:"product_url" bson:"product_url"`
+    ShopifyID    string    `json:"shopify_id" bson:"shopify_id"`
+    Handle       string    `json:"handle" bson:"handle"`
+    Title        string    `json:"title" bson:"title"`
+    Vendor       string    `json:"vendor" bson:"vendor"`
+    VendorTitle  string    `json:"vendor_title" bson:"vendor_title"`
+    Category     string    `json:"category" bson:"category"`
+    ProductType  string    `json:"product_type" bson:"product_type"`
+    ImageURL     string    `json:"image_url" bson:"image_url"`
+    Images       []string  `json:"images" bson:"images"`
+    Description  string    `json:"description" bson:"description"`
+    Price        int       `json:"price" bson:"price"`
+    ComparePrice int       `json:"compare_price" bson:"compare_price"`
+    Discount     int       `json:"discount" bson:"discount"`
+    Currency     string    `json:"currency" bson:"currency"`
+    Variants     []Variant `json:"variants" bson:"variants"`
+    Options      []Option  `json:"options" bson:"options"`
+    Tags         []string  `json:"tags" bson:"tags"`
+    Available    bool      `json:"available" bson:"available"`
 }
 
-// ProductOption represents a product option
-type ProductOption struct {
-	Name     string   `json:"name" bson:"name"`
-	Position int      `json:"position" bson:"position"`
-	Values   []string `json:"values" bson:"values"`
+// Variant represents a variant of the product
+type Variant struct {
+    ID           string `json:"id" bson:"id"`
+    Price        int    `json:"price" bson:"price"`
+    Title        string `json:"title" bson:"title"`
+    ComparePrice int    `json:"compare_price" bson:"compare_price"`
+    Option1      string `json:"option1" bson:"option1"`
+    Option2      string `json:"option2" bson:"option2"`
+    Option3      string `json:"option3" bson:"option3"`
+}
+
+// Option represents an option for the product
+type Option struct {
+    Name     string   `json:"name" bson:"name"`
+    Position int      `json:"position" bson:"position"`
+    Values   []string `json:"values" bson:"values"`
 }
 
 type User struct {
