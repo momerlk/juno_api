@@ -64,6 +64,8 @@ func main(){
 	mux.HandleFunc("/search" , app.SearchProducts); // GET : search products database given a query
 	mux.HandleFunc("/query" , app.QueryProducts); // GET : for more advanced mongodb based query search
 	
+	mux.HandleFunc("/feed/action" , app.PostAction) // POST : Post an action
+	
 
 	mux.HandleFunc("/filter" , app.Filter); // GET : get all values required for feed filter
 
