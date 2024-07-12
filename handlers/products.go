@@ -21,6 +21,7 @@ import (
 const productsColl = "products"
 
 type FilterValue struct {
+	Image 				string 				`json:"image" bson:"image"`
 	Label 				string 				`json:"label" bson:"label"`
 	Value 				string 				`json:"value" bson:"value"`
 }
@@ -54,11 +55,30 @@ func (a *App) Filter(w http.ResponseWriter, r *http.Request) {
 		http.Error(w , "Failed to get distinct brand values" , http.StatusInternalServerError);
 		return
 	}
+
+	var brandData []internal.Brand
+	cur , err := a.Database.Collection(brandsColl).Find(r.Context() , bson.M{})
+	if err != nil {
+		a.ServerError(w , "/filter" , err)
+		return
+	}
+	err = cur.All(r.Context() , &brandData)
+	if err != nil {
+		a.ServerError(w , "/filter" , err)
+		return
+	}
+
+	var images map[string]string = map[string]string{}
+	for _ , brand := range brandData {
+		images[brand.Name] = brand.Logo;
+	}
+
 	
 	filter := &FilterResponse{}
 	for _ , brand := range data {
 		label := CapitalizeWords(strings.ReplaceAll(brand.(string) , "_" , " "))
-		filter.Brands = append(filter.Brands, FilterValue{Label : label , Value : brand.(string)})
+
+		filter.Brands = append(filter.Brands, FilterValue{Image : images[brand.(string)], Label : label , Value : brand.(string)})
 	}
 
 	json.NewEncoder(w).Encode(filter);

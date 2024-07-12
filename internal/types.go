@@ -1,30 +1,40 @@
 package internal
 
+
+type Brand struct {
+	BrandID 				string 					`json:"brand_id" bson:"brand_id"`
+	Name					string					`json:"name" bson:"name"`
+	Logo					string 					`json:"logo" bson:"logo"`
+	BaseURL					string					`json:"base_url" bson:"base_url"`
+	Description 			string 					`json:"description" bson:"description"`	
+}
+
+
 const LikeAction = "like"
 const DislikeAction = "dislike"
 const AddToCartAction = "added_to_cart"
 
 // Action represents an action performed by a user
 type Action struct {
-	UserID          string      `json:"user_id" bson:"user_id"`
-	ActionID        string      `json:"action_id" bson:"action_id"`
-	ActionType      string      `json:"action_type" bson:"action_type"`
-	ActionTimestamp string      `json:"action_timestamp" bson:"action_timestamp"`
-	ProductID       string      `json:"product_id" bson:"product_id"`
-	Query           ActionQuery `json:"query" bson:"query"`
+	UserID          	string      		`json:"user_id" bson:"user_id"`
+	ActionID        	string      		`json:"action_id" bson:"action_id"`
+	ActionType      	string      		`json:"action_type" bson:"action_type"`
+	ActionTimestamp 	string      		`json:"action_timestamp" bson:"action_timestamp"`
+	ProductID       	string      		`json:"product_id" bson:"product_id"`
+	Query           	ActionQuery 		`json:"query" bson:"query"`
 }
 
 // for product just add "product_id" to filter
 type ActionQuery struct {
-	Text   string      `json:"text"`
-	Filter interface{} `json:"filter" bson:"filter"`
+	Text   				string      		`json:"text"`
+	Filter 				interface{} 		`json:"filter" bson:"filter"`
 }
 
 // Action represents an action performed by a user
 type UserHistory struct {
-	UserID   string   `json:"user_id" bson:"user_id"`
-	Products []string `json:"products" bson:"products"`
-	Index    int      `json:"index" bson:"index"`
+	UserID   			string   			`json:"user_id" bson:"user_id"`
+	Products 			[]string 			`json:"products" bson:"products"`
+	Index    			int      			`json:"index" bson:"index"`
 }
 
 // Product represents a product in the store
