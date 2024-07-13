@@ -48,12 +48,13 @@ func (a *App) RecommendWithQuery(action internal.Action, n int) ([]internal.Prod
 	//log.Println("filter =" , action.Query.Filter)
 	//log.Println("text =" , action.Query.Text)
 
+	// filter based query only
 	if action.Query.Filter != nil && action.Query.Text == "" {
 
 		// Construct the aggregation pipeline
 		pipeline := bson.A{
 			bson.M{"$match": action.Query.Filter}, // Add $match stage to filter by category
-			bson.M{"$sample": bson.M{"size": n}},  // Add $sample stage for random sampling
+			bson.M{"$limit" : n}, // limit to n items
 		}
 
 		// Perform aggregation
@@ -75,6 +76,7 @@ func (a *App) RecommendWithQuery(action internal.Action, n int) ([]internal.Prod
 		defer cur.Close(context.TODO())
 
 		remainingProducts := n - len(results)
+		log.Println("remaining products = ", remainingProducts)
 		if remainingProducts > 2 {
 			recs, err := a.Recommend(action.UserID , remainingProducts)
 			if err != nil {
