@@ -1,2 +1,4 @@
-go.sum
+# Local env files
+.env
+
 server

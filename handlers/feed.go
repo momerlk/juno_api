@@ -26,6 +26,10 @@ func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data [
 		return err
 	}
 
+	action.UserID = conn.UserId;
+	action.ActionTimestamp = time.Now().String()
+	action.ActionID = uuid.NewString()
+
 
 	// TODO : Each product can have multiple ratings change that
 	// Make an entire user ratings portfolio
@@ -72,7 +76,7 @@ func (a *App) RecommendWithQuery(action internal.Action, n int) ([]internal.Prod
 
 		remainingProducts := n - len(results)
 		if remainingProducts > 2 {
-			recs, err := a.Recommend(remainingProducts)
+			recs, err := a.Recommend(action.UserID , remainingProducts)
 			if err != nil {
 				return nil, err
 			}
@@ -131,7 +135,7 @@ func (a *App) RecommendWithQuery(action internal.Action, n int) ([]internal.Prod
 
 		remainingProducts := n - len(products)
 		if remainingProducts > 2 {
-			recs, err := a.Recommend(remainingProducts)
+			recs, err := a.Recommend(action.UserID , remainingProducts)
 			if err != nil {
 				return nil, err
 			}
@@ -142,7 +146,7 @@ func (a *App) RecommendWithQuery(action internal.Action, n int) ([]internal.Prod
 	}
 
 	// standard feed
-	return a.Recommend(n)
+	return a.Recommend(action.UserID , n)
 }
 
 // handles actions with action type "open"

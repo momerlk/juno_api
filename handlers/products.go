@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -144,31 +142,13 @@ func (a *App) Liked(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(products)
 }
 
-func (a *App) Recommend(n int) ([]internal.Product, error) {
-	// get a cursor over the aggregation of products
-	cur, err := a.Database.Collection(productsColl).Aggregate(
-		context.TODO(),
-		bson.A{bson.M{"$sample": bson.M{"size": n}}},
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer cur.Close(context.TODO())
-
-	var results []internal.Product
-	err = cur.All(context.TODO(), &results)
-	if err != nil {
-		return nil, err
-	}
-
-	return results, nil
-}
 
 func (a *App) Products(w http.ResponseWriter, r *http.Request) {
-	_, ok := internal.Verify(w, r)
+	claims, ok := internal.Verify(w, r)
 	if !ok {
 		return
 	}
+	userId := claims["user_id"]
 
 	query_N := r.URL.Query().Get("n")
 	n, err := strconv.Atoi(query_N)
@@ -177,21 +157,10 @@ func (a *App) Products(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get a cursor over the aggregation of products
-	cur, err := a.Database.Collection(productsColl).Aggregate(
-		r.Context(),
-		bson.A{bson.M{"$sample": bson.M{"size": n}}},
-	)
+	results , err := a.Recommend(userId.(string) , n)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Could not get aggregation of products, err : %v", err.Error()), http.StatusInternalServerError)
-		return
-	}
-	defer cur.Close(r.Context())
-
-	var results []internal.Product
-	err = cur.All(r.Context(), &results)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Could not get aggregation of products, err : %v", err.Error()), http.StatusInternalServerError)
+		log.Println("recommendations system error =" , err)
+		http.Error(w , "Failed to get recommendations internally" , http.StatusInternalServerError)
 		return
 	}
 
@@ -306,7 +275,8 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 		}},
 	}
 
-	limitStage := bson.D{{Key: "$limit", Value: 50}}
+	// TODO : change limit
+	limitStage := bson.D{{Key: "$limit", Value: 70}}
 
 	// Perform the search
 	collection := a.Database.Collection(productsColl)
@@ -335,6 +305,12 @@ func (a *App) QueryProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims , ok := internal.Verify(w,r)
+	if !ok {
+		return
+	}
+	userId := claims["user_id"]
+
 	var body internal.ActionQuery
 	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
@@ -342,7 +318,10 @@ func (a *App) QueryProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	products, err := a.RecommendWithQuery(internal.Action{Query: body}, 50)
+	products, err := a.RecommendWithQuery(internal.Action{
+		UserID: userId.(string),
+		Query: body,
+	}, 50)
 	if err != nil {
 		http.Error(w, "Failed to get query", http.StatusInternalServerError)
 		return

@@ -14,6 +14,7 @@ const LikeAction = "like"
 const DislikeAction = "dislike"
 const AddToCartAction = "added_to_cart"
 const DeletedFromCartAction = "deleted_from_cart"
+const PurchaseAction = "purchase"
 
 // Action represents an action performed by a user
 type Action struct {
