@@ -210,9 +210,19 @@ func (a *App) Cart(w http.ResponseWriter, r *http.Request) {
 	}
 	userId := claims["user_id"]
 
+	
 	actions, err := internal.Get[internal.Action](
 		r.Context(), &a.Database, actionsColl,
 		bson.M{"user_id": userId, "action_type": internal.AddToCartAction},
+	)
+	if err != nil {
+		a.ServerError(w, "CART", err) // TODO : add error strings to server error
+		return
+	}
+
+	deletedActions, err := internal.Get[internal.Action](
+		r.Context(), &a.Database, actionsColl,
+		bson.M{"user_id": userId, "action_type": internal.DeletedFromCartAction},
 	)
 	if err != nil {
 		a.ServerError(w, "CART", err) // TODO : add error strings to server error
@@ -223,9 +233,15 @@ func (a *App) Cart(w http.ResponseWriter, r *http.Request) {
 
 	productIds := []string{}	
 
-	for _, action := range actions {
-		productIds = append(productIds, action.ProductID)
-	}
+	main : 
+		for _, action := range actions {
+			for _ , deleted := range deletedActions{
+				if deleted.ProductID == action.ProductID{
+					continue main
+				}
+			}	
+			productIds = append(productIds, action.ProductID)
+		}
 
 	cursor , err := a.Database.Collection(productsColl).Find(
 		r.Context() , 

@@ -13,6 +13,7 @@ type Brand struct {
 const LikeAction = "like"
 const DislikeAction = "dislike"
 const AddToCartAction = "added_to_cart"
+const DeletedFromCartAction = "deleted_from_cart"
 
 // Action represents an action performed by a user
 type Action struct {
