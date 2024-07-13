@@ -76,7 +76,6 @@ func (a *App) RecommendWithQuery(action internal.Action, n int) ([]internal.Prod
 		defer cur.Close(context.TODO())
 
 		remainingProducts := n - len(results)
-		log.Println("remaining products = ", remainingProducts)
 		if remainingProducts > 2 {
 			recs, err := a.Recommend(action.UserID , remainingProducts)
 			if err != nil {
