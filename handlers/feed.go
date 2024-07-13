@@ -60,6 +60,7 @@ func (a *App) RecommendWithQuery(action internal.Action, n int) ([]internal.Prod
 		if err != nil {
 			return nil, err
 		}
+		defer cur.Close(context.TODO())
 
 		// Decode results into a slice of internal.Product
 		var results []internal.Product

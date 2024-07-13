@@ -104,6 +104,7 @@ func (a *App) Liked(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to retrieve user actions", http.StatusInternalServerError)
 		return
 	}
+	defer cursor.Close(r.Context())
 
 	err = cursor.All(r.Context(), &actions)
 	if err != nil {
@@ -129,6 +130,7 @@ func (a *App) Liked(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error fetching products:", err)
 		return
 	}
+	defer cursor.Close(r.Context())
 
 	// Iterate over the cursor and decode each product
 	if err = cursor.All(r.Context(), &products); err != nil {
@@ -151,6 +153,7 @@ func (a *App) Recommend(n int) ([]internal.Product, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(context.TODO())
 
 	var results []internal.Product
 	err = cur.All(context.TODO(), &results)
@@ -183,6 +186,7 @@ func (a *App) Products(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Could not get aggregation of products, err : %v", err.Error()), http.StatusInternalServerError)
 		return
 	}
+	defer cur.Close(r.Context())
 
 	var results []internal.Product
 	err = cur.All(r.Context(), &results)
