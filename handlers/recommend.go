@@ -11,6 +11,44 @@ import (
 )
 
 
+const recommendationColl = "recommendations"
+type Recommendation struct {
+	UserId 				string 				`json:"user_id" bson:"user_id"`
+	ProductID 			string 				`json:"product_id" bson:"product_id"`
+}
+
+func (a *App) RecommendRandom(userId string , n int, save bool) ([]internal.Product, error) {
+	// get a cursor over the aggregation of products
+	cur , err := a.Database.Collection("products").Aggregate(
+		context.TODO(),
+		bson.A{bson.M{"$sample": bson.M{"size": n}}},
+	)
+	if err != nil {
+		return nil,  err
+	}
+
+	var results []internal.Product
+	err = cur.All(context.TODO() , &results)
+	if err != nil {
+		return nil , err
+	}
+
+	if save {
+		var newRecs = []any{}
+		for _ , result := range results {
+			newRecs = append(newRecs, Recommendation{
+				UserId: userId,
+				ProductID: result.ProductID,
+			})
+		}
+		// upload recommendations to recCol TODO : add error handling here
+		a.Database.Collection(recommendationColl).InsertMany(context.TODO() , newRecs)
+	}
+
+
+	return results , nil
+}
+
 func (a *App) Recommend(userId string, n int) ([]internal.Product , error){
 	stopwatch := &internal.Stopwatch{}
 	stopwatch.Start()
@@ -67,6 +105,12 @@ func (a *App) Recommend(userId string, n int) ([]internal.Product , error){
 		}
 	}
 
+	// recommend random things to new users. TODO : recommend trending items
+	if len(liked) == 0 {
+		randomRecs , err := a.RecommendRandom(userId , n , true)
+		return randomRecs , err
+	}
+
 	dislikedQuery :=  bson.D{
         {Key: "$search", Value: bson.D{
             {Key: "index", Value: "aisearch"}, 
@@ -98,6 +142,22 @@ func (a *App) Recommend(userId string, n int) ([]internal.Product , error){
 		dislikedIds = append(dislikedIds, product.ProductID)
 	}
 
+	// already recommended products
+	var recs []Recommendation
+	recIds := []string{}
+	recCol := a.Database.Collection(recommendationColl)
+	recCursor , err := recCol.Find(context.TODO() , bson.M{"user_id" : userId})
+	if err != nil {
+		return nil , err
+	}
+	err = recCursor.All(context.TODO() , &recs)
+	if err != nil {
+		return nil , err
+	}
+	for _ , rec := range recs {
+		recIds = append(recIds , rec.ProductID)
+	}
+
 
 	// Define the query
     query := bson.D{
@@ -123,6 +183,11 @@ func (a *App) Recommend(userId string, n int) ([]internal.Product , error){
 					{Key: "$nin", Value: productIds},
 				}},
 			}}}, // remove seen products
+			bson.D{{Key: "$match", Value: bson.D{
+				{Key: "product_id", Value: bson.D{
+					{Key: "$nin", Value: recIds},
+				}},
+			}}}, // remove recommended products
 			bson.D{{Key: "$limit", Value: n}}, // Limit the results to n
 			bson.D{{Key: "$group", Value: bson.D{
 				{Key: "_id", Value: "$product_id"},
@@ -144,6 +209,16 @@ func (a *App) Recommend(userId string, n int) ([]internal.Product , error){
     if err = finalCursor.All(context.TODO(), &results); err != nil {
         return nil , err
     }
+
+	var newRecs = []any{}
+	for _ , result := range results {
+		newRecs = append(newRecs, Recommendation{
+			UserId: userId,
+			ProductID: result.ProductID,
+		})
+	}
+	// upload recommendations to recCol
+	recCol.InsertMany(context.TODO() , newRecs)
 
 	stopwatch.Stop()
 	log.Printf("recommended %v products in %v seconds" , len(results), stopwatch.Elapsed().Seconds())
