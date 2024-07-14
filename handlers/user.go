@@ -39,7 +39,6 @@ func (a *App) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("password =", body.Password)
 
 	body.Id = uuid.NewString()
 

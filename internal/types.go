@@ -82,17 +82,18 @@ type Option struct {
 }
 
 type User struct {
-	Id 		string `json:"id" bson:"id"` // user id
+	Id 				string 	`json:"id" bson:"id"` // user id
 
-	Avatar 	string `json:"avatar" bson:"avatar"` // url of the avatar image file
-	Age 	int		`json:"age" bson:"age"`
+	Avatar 			string 	`json:"avatar" bson:"avatar"` // url of the avatar image file
+	Age 			int		`json:"age" bson:"age"`
+	Gender 			string 	`json:"gender" bson:"gender"`
 
-	Name     string `json:"name" bson:"name"`         // full name
-	Number   string `json:"number" bson:"number"`     // phone number only +92
-	Username string `json:"username" bson:"username"` // username
+	Name     		string 	`json:"name" bson:"name"`         // full name
+	PhoneNumber   	string 	`json:"phone_number" bson:"phone_number"`     // phone number only +92
+	Username 		string 	`json:"username" bson:"username"` // username
 
-	Email    string `json:"email" bson:"email"`       // email
-	Password string `json:"password" bson:"password"` // password
+	Email    		string 	`json:"email" bson:"email"`       // email
+	Password 		string 	`json:"password" bson:"password"` // password
 }
 
 type Direct struct {
