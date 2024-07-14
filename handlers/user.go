@@ -20,6 +20,19 @@ import (
 
 const usersColl = "users"
 
+func FmtPhoneNumber (param string) string {
+	PhoneNumber := param
+	PhoneNumber = strings.ReplaceAll(PhoneNumber , " " , "")
+
+	after , _ := strings.CutPrefix(PhoneNumber , "+92")
+	after, found := strings.CutPrefix(after , "0")
+	if found {
+		PhoneNumber = "+92" + after
+	}
+
+	return PhoneNumber
+}
+
 func GenerateToken(UserId string) (string, error){
 	secret := internal.Getenv("JWT_KEY")
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -51,14 +64,7 @@ func (a *App) SignUp(w http.ResponseWriter, r *http.Request) {
 	body.Password = hashed
 
 	// remove all whitespace
-	body.PhoneNumber = strings.ReplaceAll(body.PhoneNumber , " " , "") 
-
-	// remove prefix 0 after +92 , so remove the 0 in +92 03...
-	after , _ := strings.CutPrefix(body.PhoneNumber , "+92")
-	after, found := strings.CutPrefix(after , "0")
-	if found {
-		body.PhoneNumber = "+92" + after
-	}
+	body.PhoneNumber = FmtPhoneNumber(body.PhoneNumber)
 
 	a.Database.Store(r.Context(), usersColl, body)
 
