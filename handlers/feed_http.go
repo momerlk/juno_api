@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
 	"juno.api/internal"
 )
 
@@ -47,4 +48,28 @@ func (a *App) PostAction(w http.ResponseWriter , r *http.Request){
 		w.Write([]byte("successfully added action to database"))
 	}
 
+}
+
+
+func (a *App) Brands(w http.ResponseWriter , r *http.Request){
+	if r.Method != http.MethodGet {
+		a.ClientError(w , http.StatusMethodNotAllowed)
+		return
+	}
+
+	cursor , err := a.Database.Collection(brandsColl).Find(r.Context() , bson.M{})
+	if err != nil {
+		a.ServerError(w , "/brands" , err)
+		return
+	}
+	defer cursor.Close(r.Context())
+
+	var brands []internal.Brand
+	err = cursor.All(r.Context() , &brands);
+	if err != nil {
+		a.ServerError(w , "/brands" , err)
+		return
+	}
+
+	json.NewEncoder(w).Encode(brands)
 }
