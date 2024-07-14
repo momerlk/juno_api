@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"strings"
 	"time"
 
 	"encoding/json"
@@ -48,6 +49,16 @@ func (a *App) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Password = hashed
+
+	// remove all whitespace
+	body.PhoneNumber = strings.ReplaceAll(body.PhoneNumber , " " , "") 
+
+	// remove prefix 0 after +92 , so remove the 0 in +92 03...
+	after , _ := strings.CutPrefix(body.PhoneNumber , "+92")
+	after, found := strings.CutPrefix(after , "0")
+	if found {
+		body.PhoneNumber = "+92" + after
+	}
 
 	a.Database.Store(r.Context(), usersColl, body)
 
