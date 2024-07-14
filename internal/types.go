@@ -82,9 +82,10 @@ type Option struct {
 }
 
 type User struct {
-	Id string `json:"id" bson:"id"` // user id
+	Id 		string `json:"id" bson:"id"` // user id
 
-	Avatar string `json:"avatar" bson:"avatar"` // url of the avatar image file
+	Avatar 	string `json:"avatar" bson:"avatar"` // url of the avatar image file
+	Age 	int		`json:"age" bson:"age"`
 
 	Name     string `json:"name" bson:"name"`         // full name
 	Number   string `json:"number" bson:"number"`     // phone number only +92
