@@ -298,7 +298,7 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 	
 
 	if randomize {
-		limitStage  = bson.D{{Key: "$limit", Value: 1000}}
+		limitStage  = bson.D{{Key: "$limit", Value: 2000}}
 		sampleStage := bson.D{
 			bson.E{
 				Key: "$sample", Value: bson.D{
@@ -306,6 +306,7 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 		}
+		log.Printf("randomised search with %v results" ,n)
 		pipeline = mongo.Pipeline{query, limitStage, sampleStage}
 	} else {
 		pipeline = mongo.Pipeline{query, limitStage}
