@@ -292,17 +292,28 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO : change limit
-	limitStage := bson.D{{Key: "$limit", Value: n}}
+	var pipeline []bson.D
+
+	limitStage  := bson.D{{Key: "$limit", Value: n}}
+	
 
 	if randomize {
-		limitStage = bson.D{
-			{Key : "$sample", Value : n},
+		limitStage  = bson.D{{Key: "$limit", Value: 1000}}
+		sampleStage := bson.D{
+			bson.E{
+				Key: "$sample", Value: bson.D{
+					{Key: "size", Value: n},
+				},
+			},
 		}
+		pipeline = mongo.Pipeline{query, limitStage, sampleStage}
+	} else {
+		pipeline = mongo.Pipeline{query, limitStage}
 	}
 
 	// Perform the search
 	collection := a.Database.Collection(productsColl)
-	cursor, err := collection.Aggregate(r.Context(), mongo.Pipeline{query, limitStage})
+	cursor, err := collection.Aggregate(r.Context(), pipeline)
 	if err != nil {
 		log.Println("Failed to perform search, err =", err)
 		http.Error(w, "Failed to perform search", http.StatusInternalServerError)
