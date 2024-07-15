@@ -283,13 +283,19 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	n := 70
+	query_N := r.URL.Query().Get("n")
+	if query_N != "" {
+		result, _ := strconv.Atoi(query_N)
+		if result > 0 {
+			n = result
+		}
+	}
 
 	// TODO : change limit
 	limitStage := bson.D{{Key: "$limit", Value: n}}
 
 	if randomize {
 		limitStage = bson.D{
-			{Key : "$limit", Value : n*4}, // top n*4 results
 			{Key : "$sample", Value : n},
 		}
 	}
