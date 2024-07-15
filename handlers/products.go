@@ -262,6 +262,13 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	randomString := r.URL.Query().Get("random")
+	randomize := false
+	if randomString == "yes" {
+		randomize = true
+	}
+	
+
 	// Construct the query with fuzzy parameters
 	query := bson.D{
 		{Key: "$search", Value: bson.D{
@@ -275,8 +282,17 @@ func (a *App) SearchProducts(w http.ResponseWriter, r *http.Request) {
 		}},
 	}
 
+	n := 70
+
 	// TODO : change limit
-	limitStage := bson.D{{Key: "$limit", Value: 70}}
+	limitStage := bson.D{{Key: "$limit", Value: n}}
+
+	if randomize {
+		limitStage = bson.D{
+			{Key : "$limit", Value : n*4}, // top n*4 results
+			{Key : "$sample", Value : n},
+		}
+	}
 
 	// Perform the search
 	collection := a.Database.Collection(productsColl)
