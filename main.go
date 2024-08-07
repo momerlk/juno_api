@@ -46,6 +46,7 @@ func main(){
 		Database: db,
 	}
 
+	mux.HandleFunc("/verify", app.VerifyToken) // GET : Verifiy a token
 	
 
 	mux.HandleFunc("/upload" , app.UploadFile); // POST : Upload a file to the database using gridFS

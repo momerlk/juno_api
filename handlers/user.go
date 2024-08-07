@@ -6,7 +6,6 @@ import (
 
 	"encoding/json"
 
-	jwt "github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/google/uuid"
@@ -30,6 +29,14 @@ func FmtPhoneNumber (param string) string {
 	}
 
 	return PhoneNumber
+}
+
+func (a *App) VerifyToken(w http.ResponseWriter , r *http.Request){
+	_ , ok := internal.Verify(w,r)
+	if ok {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 }
 
 func (a *App) SignUp(w http.ResponseWriter, r *http.Request) {
@@ -124,35 +131,7 @@ func (a *App) SignIn(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func Verify(w http.ResponseWriter, r *http.Request) (jwt.MapClaims, bool) {
-	tokenString := r.Header.Get("Authorization")
-	if tokenString == "" {
-		http.Error(w, "Authorization token missing", http.StatusUnauthorized)
-		return nil, false
-	}
 
-	var tokenClaims jwt.MapClaims
-
-	// Parse the token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		key := internal.Getenv("JWT_KEY")
-		return []byte(key), nil
-	})
-	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
-		return nil, false
-	}
-
-	// Check if the token is valid and not expired
-	if claims, ok := token.Claims.(jwt.MapClaims); !ok || !token.Valid {
-		http.Error(w, "Invalid token (expired)", http.StatusUnauthorized)
-		return nil, false
-	} else {
-		tokenClaims = claims
-	}
-
-	return tokenClaims, true
-}
 
 func (a *App) Refresh(w http.ResponseWriter , r *http.Request){
 	if r.Method != http.MethodGet {
