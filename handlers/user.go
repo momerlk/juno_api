@@ -95,7 +95,7 @@ func (a *App) SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user internal.User
-	ok, err := a.Database.Get(r.Context(), usersColl, bson.M{"username": body.UsernameEmail}, &user)
+	ok, err := a.Database.Get(r.Context(), usersColl, bson.M{"phone_number": body.UsernameEmail}, &user)
 	if err != nil {
 		a.ServerError(w, "Sign In a.Database.Get()", err)
 		return
