@@ -3,7 +3,6 @@ package handlers
 import (
 	"log"
 	"strings"
-	"time"
 
 	"encoding/json"
 
@@ -31,18 +30,6 @@ func FmtPhoneNumber (param string) string {
 	}
 
 	return PhoneNumber
-}
-
-func GenerateToken(UserId string) (string, error){
-	secret := internal.Getenv("JWT_KEY")
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"user_id":    UserId,
-			"session_id": internal.GenerateId(),
-			"exp":        time.Now().Add(4 * time.Hour).Unix(),
-		})
-
-	tokenString, err := token.SignedString([]byte(secret))
-	return tokenString , err;
 }
 
 func (a *App) SignUp(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +102,7 @@ func (a *App) SignIn(w http.ResponseWriter, r *http.Request) {
 	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password)) == nil {
 		log.Println("user is authenticated")
 
-		tokenString, err := GenerateToken(user.Id);
+		tokenString, err := internal.GenerateToken(user.Id);
 		if err != nil {
 			a.ServerError(w, "Sign In", err)
 			return
@@ -180,7 +167,7 @@ func (a *App) Refresh(w http.ResponseWriter , r *http.Request){
 
 	userId := claims["user_id"];
 
-	token, err := GenerateToken(userId.(string))
+	token, err := internal.GenerateToken(userId.(string))
 	if err != nil {
 		http.Error(w , "Failed to generate authentication token" , http.StatusInternalServerError);
 		return;

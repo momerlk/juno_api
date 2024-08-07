@@ -47,8 +47,6 @@ func main(){
 	}
 
 	
-	ws := &internal.WebSocket{};
-	ws.Init(mux , "/feed" , app.WSFeed);
 
 	mux.HandleFunc("/upload" , app.UploadFile); // POST : Upload a file to the database using gridFS
 	mux.HandleFunc("/file", app.DownloadFile);	// GET : download file from the database using gridFS

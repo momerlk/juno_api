@@ -2,12 +2,8 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"log"
-	"net/http"
-	"time"
 
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"juno.api/internal"
@@ -18,31 +14,7 @@ const actionsColl = "actions"
 // FEED Options : query, filter, see product
 
 // websocket handler for directs
-func (a *App) WSFeed(ws *internal.WebSocket, conn *internal.WSConnection, data []byte) (err error) {
 
-	var action internal.Action
-	err = json.Unmarshal(data, &action)
-	if err != nil {
-		return err
-	}
-
-	action.UserID = conn.UserId;
-	action.ActionTimestamp = time.Now().String()
-	action.ActionID = uuid.NewString()
-
-
-	// TODO : Each product can have multiple ratings change that
-	// Make an entire user ratings portfolio
-
-	switch action.ActionType {
-	case "open":
-		a.handleOpen(ws, conn, action)
-	default:
-		a.handleSwipes(ws, conn, action)
-	}
-
-	return err
-}
 
 func (a *App) RecommendWithQuery(action internal.Action, n int) ([]internal.Product, error) {
 	//log.Println("filter =" , action.Query.Filter)
@@ -150,77 +122,3 @@ func (a *App) RecommendWithQuery(action internal.Action, n int) ([]internal.Prod
 	return a.Recommend(action.UserID , n)
 }
 
-// handles actions with action type "open"
-func (a *App) handleOpen(
-	ws *internal.WebSocket,
-	conn *internal.WSConnection,
-	action internal.Action,
-) {
-	products, err := a.RecommendWithQuery(action, 10)
-	if err != nil {
-		ws.Message(
-			conn,
-			http.StatusInternalServerError,
-			"Failed to get product recommendations",
-		)
-		return
-	}
-
-	data, err := json.Marshal(products)
-	if err != nil {
-		ws.Message(
-			conn,
-			http.StatusInternalServerError,
-			"Failed to encode products data into JSON",
-		)
-	}
-
-	ws.Send(conn.UserId, data)
-}
-
-// for handling swipes
-func (a *App) handleSwipes(
-	ws *internal.WebSocket,
-	conn *internal.WSConnection,
-	action internal.Action,
-) {
-
-	actionData := &internal.Action{
-		UserID:          conn.UserId,
-		ProductID:       action.ProductID,
-		ActionType:      action.ActionType,
-		ActionID:        uuid.NewString(),
-		ActionTimestamp: time.Now().String(),
-	}
-
-	err := a.Database.Store(context.TODO(), actionsColl, actionData)
-	if err != nil {
-		ws.Message(
-			conn,
-			http.StatusInternalServerError,
-			"Failed to save user action",
-		)
-		return
-	}
-
-	products, err := a.RecommendWithQuery(action, 4)
-	if err != nil {
-		ws.Message(
-			conn,
-			http.StatusInternalServerError,
-			"Failed to get product recommendations",
-		)
-		return
-	}
-
-	data, err := json.Marshal(products)
-	if err != nil {
-		ws.Message(
-			conn,
-			http.StatusInternalServerError,
-			"Failed to encode products data into JSON",
-		)
-	}
-
-	ws.Send(conn.UserId, data)
-}
