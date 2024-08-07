@@ -3,19 +3,15 @@ module juno.api
 go 1.22
 
 require (
-	github.com/gobwas/ws v1.4.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/rs/cors v1.11.0
 	go.mongodb.org/mongo-driver v1.15.1
 	golang.org/x/crypto v0.24.0
-	golang.org/x/sys v0.21.0
 )
 
 require (
-	github.com/gobwas/httphead v0.1.0 // indirect
-	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
